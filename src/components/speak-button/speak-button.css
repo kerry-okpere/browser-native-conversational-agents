@@ -1,0 +1,22 @@
+.speak {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 420px;
+  margin-top: 1rem;
+}
+
+input,
+button {
+  font: inherit;
+  padding: 0.5rem;
+}
+
+progress {
+  width: 100%;
+}
+
+.status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #555;
+}
