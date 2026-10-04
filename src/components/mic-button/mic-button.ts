@@ -31,10 +31,10 @@ export class MicButton extends HTMLElement {
     let recorder: MediaRecorder | null = null;
 
     const loadModel = (stt: Stt) =>
-      stt.load((percentage) => {
+      stt.load((fraction) => {
         if (stt.loaded) return;
         progress.hidden = false;
-        progress.value = percentage;
+        progress.value = fraction * 100;
       }).finally(() => {
         progress.hidden = true;
       });

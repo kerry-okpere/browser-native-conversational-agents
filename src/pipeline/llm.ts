@@ -20,7 +20,7 @@ export function createLlm(): Llm {
   let session: Promise<Session> | null = null;
   let loaded = false;
   let onDownloadProgress: ((fraction: number) => void) | undefined;
-  let warmingUp: Promise<boolean> | null = null;
+  let warmingUp: Promise<void> | null = null;
 
   const supported = () => "LanguageModel" in self;
 
@@ -58,11 +58,10 @@ export function createLlm(): Llm {
       return loaded;
     },
     availability,
+    isDownloaded: async () => (await availability()) === "available",
     warmUp() {
       // Runs once; later calls get the same result.
       warmingUp ??= (async () => {
-        if ((await availability()) !== "available") return false;
-
         const base = await getSession();
         // Prompt a throwaway copy so the warm-up exchange never becomes part of
         // the real conversation. The model stays in memory for the base session.
@@ -72,8 +71,12 @@ export function createLlm(): Llm {
         } finally {
           copy.destroy();
         }
-        return true;
-      })().catch(() => false);
+      })();
+
+      // Allow a retry if it failed.
+      warmingUp.catch(() => {
+        warmingUp = null;
+      });
       return warmingUp;
     },
     async load(onProgress) {

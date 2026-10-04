@@ -1,11 +1,9 @@
 import html from './speak-button.html?raw';
 import css from './speak-button.css?inline';
-import type { Speak } from '../../pipeline/index.type';
-
-const toMB = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+import type { Tts } from '../../pipeline/index.type';
 
 export class SpeakButton extends HTMLElement {
-  speak?: Speak;
+  tts?: Tts;
 
   connectedCallback() {
     const root = this.attachShadow({ mode: 'open' });
@@ -17,25 +15,22 @@ export class SpeakButton extends HTMLElement {
     const status = root.querySelector('.status')!;
 
     button.addEventListener('click', async () => {
-      if (!this.speak) return;
+      if (!this.tts) return;
 
       button.disabled = true;
       status.textContent = 'Generating speech…';
 
       try {
         // Progress only fires the first time, while the voice model downloads.
-        await this.speak(input.value, ({ loaded, total }) => {
+        await this.tts.load((fraction) => {
           progress.hidden = false;
-          if (total) {
-            progress.max = total;
-            progress.value = loaded;
-          } else {
-            progress.removeAttribute('value'); // unknown size: indeterminate bar
-          }
-          status.textContent = loaded === total
-            ? 'Generating speech…'
-            : `Downloading voice… ${toMB(loaded)}${total ? ` / ${toMB(total)}` : ''}`;
+          progress.value = fraction;
+          status.textContent = `Downloading voice… ${Math.floor(fraction * 100)}%`;
         });
+        progress.hidden = true;
+        status.textContent = 'Generating speech…';
+
+        await this.tts.speak(input.value);
         status.textContent = '';
       } catch (error) {
         status.textContent = `Error: ${(error as Error).message}`;

@@ -13,28 +13,46 @@ export type CreateOptions = {
   monitor?: (monitor: EventTarget) => void;
 };
 
-export type Llm = {
-  /** Whether a session is created and ready to answer. */
+/** The lifecycle every pipeline stage (STT, LLM, TTS) shares. */
+export type Stage = {
+  /** Whether the model is in memory and ready to use. */
   readonly loaded: boolean;
-  /** Whether Chrome has the model, needs to download it, or can't run it. */
-  availability: () => Promise<Availability>;
+  /** Whether the model files are already on this device, so loading needs no download. */
+  isDownloaded: () => Promise<boolean>;
   /**
-   * Create the session, downloading the model first if needed.
-   * `onProgress` gets a fraction from 0 to 1. Starting a download requires a
-   * user gesture, so call this from a click or submit handler.
+   * Download the model if needed and load it into memory. `onProgress` gets
+   * the download as a fraction from 0 to 1. Safe to call more than once.
    */
   load: (onProgress?: (fraction: number) => void) => Promise<void>;
+  /** Load, then run once on throwaway input so the first real use is fast. */
+  warmUp: () => Promise<void>;
+  /** Release the memory the model holds. It loads again on next use. */
+  destroy: () => void;
+};
+
+export type Stt = Stage & {
+  /** Transcribe 16 kHz mono samples. */
+  transcribe: (audio: Float32Array) => Promise<string>;
+  /** Unload the model and delete its downloaded files. */
+  deleteDownloads: () => Promise<void>;
+};
+
+export type Llm = Stage & {
   /**
-   * Load the model into memory and run one throwaway prompt, so the first real
-   * reply is fast. Only runs if the model is already downloaded (no user
-   * gesture needed, no surprise download). Resolves to whether it warmed up.
-   * Runs once; calling it again returns the same result.
+   * Whether Chrome has the model, needs to download it, or can't run it.
+   * Starting a download requires a user gesture, so when this isn't
+   * "available", call `load` from a click or submit handler.
    */
-  warmUp: () => Promise<boolean>;
+  availability: () => Promise<Availability>;
   /** Send a message; `onChunk` receives the reply piece by piece as it is generated. */
   reply: (text: string, onChunk: (chunk: string) => void) => Promise<string>;
-  /** Release the session's memory. The conversation so far is forgotten. */
-  destroy: () => void;
+};
+
+export type Tts = Stage & {
+  /** Turn text into speech and play it. */
+  speak: (text: string) => Promise<void>;
+  /** Unload the model and delete its downloaded files. */
+  deleteDownloads: () => Promise<void>;
 };
 
 /** How one stage's warm-up at page load went. */
@@ -48,26 +66,10 @@ export type WarmUpResult =
 export type WarmUp = Record<"stt" | "llm" | "tts", Promise<WarmUpResult>>;
 
 export type Models = {
-  /** Terminate the workers and the LLM session, releasing the RAM/GPU memory they hold. */
+  /** Unload every stage, releasing the RAM/GPU memory the models hold. */
   freeMemory: () => void;
   /** Free memory, then delete the downloaded model files from this site's storage. */
   deleteDownloads: () => Promise<void>;
 };
 
-export type Stt = {
-  /** Whether the model is loaded and warmed up. */
-  readonly loaded: boolean;
-  /** Download and warm up the model. Safe to call more than once. */
-  load: (onProgress?: (percentage: number) => void) => Promise<void>;
-  /** Transcribe 16 kHz mono samples. */
-  transcribe: (audio: Float32Array) => Promise<string>;
-};
-
-import type { Progress } from "@diffusionstudio/vits-web";
 export type Settle<T> = { resolve: (value: T) => void; reject: (error: Error) => void };
-export type Speak = (
-  text: string,
-  onProgress?: (progress: Pick<Progress, "loaded" | "total">) => void,
-) => Promise<void>;
-
-

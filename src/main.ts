@@ -6,10 +6,10 @@ import './components/chat-box/chat-box';
 import './components/model-controls/model-controls';
 import { init } from './init';
 
-const { speak, stt, llm, models, warmUp } = init();
+const { stt, llm, tts, models, warmUp } = init();
 
 document.querySelector('warm-up-status')!.show(warmUp);
-document.querySelector('speak-button')!.speak = speak;
+document.querySelector('speak-button')!.tts = tts;
 document.querySelector('mic-button')!.stt = stt;
 document.querySelector('chat-box')!.llm = llm;
 document.querySelector('model-controls')!.models = models;
