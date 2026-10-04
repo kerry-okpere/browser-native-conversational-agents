@@ -20,6 +20,7 @@ export function createLlm(): Llm {
   let session: Promise<Session> | null = null;
   let loaded = false;
   let onDownloadProgress: ((fraction: number) => void) | undefined;
+  let warmingUp: Promise<boolean> | null = null;
 
   const supported = () => "LanguageModel" in self;
 
@@ -49,11 +50,32 @@ export function createLlm(): Llm {
     return session;
   }
 
+  const availability = async () =>
+    supported() ? LanguageModel.availability(OPTIONS) : "unavailable";
+
   return {
     get loaded() {
       return loaded;
     },
-    availability: async () => (supported() ? LanguageModel.availability(OPTIONS) : "unavailable"),
+    availability,
+    warmUp() {
+      // Runs once; later calls get the same result.
+      warmingUp ??= (async () => {
+        if ((await availability()) !== "available") return false;
+
+        const base = await getSession();
+        // Prompt a throwaway copy so the warm-up exchange never becomes part of
+        // the real conversation. The model stays in memory for the base session.
+        const copy = await base.clone();
+        try {
+          await copy.prompt("Hi");
+        } finally {
+          copy.destroy();
+        }
+        return true;
+      })().catch(() => false);
+      return warmingUp;
+    },
     async load(onProgress) {
       onDownloadProgress = onProgress;
       await getSession();
@@ -74,6 +96,7 @@ export function createLlm(): Llm {
       session?.then((s) => s.destroy()).catch(() => {});
       session = null;
       loaded = false;
+      warmingUp = null;
     },
   };
 }

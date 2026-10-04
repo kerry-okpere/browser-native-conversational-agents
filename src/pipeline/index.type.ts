@@ -1,6 +1,8 @@
 export type Availability = "unavailable" | "downloadable" | "downloading" | "available";
 export type Session = {
+  prompt(input: string): Promise<string>;
   promptStreaming(input: string): ReadableStream<string>;
+  clone(): Promise<Session>;
   destroy(): void;
 };
 
@@ -22,11 +24,28 @@ export type Llm = {
    * user gesture, so call this from a click or submit handler.
    */
   load: (onProgress?: (fraction: number) => void) => Promise<void>;
+  /**
+   * Load the model into memory and run one throwaway prompt, so the first real
+   * reply is fast. Only runs if the model is already downloaded (no user
+   * gesture needed, no surprise download). Resolves to whether it warmed up.
+   * Runs once; calling it again returns the same result.
+   */
+  warmUp: () => Promise<boolean>;
   /** Send a message; `onChunk` receives the reply piece by piece as it is generated. */
   reply: (text: string, onChunk: (chunk: string) => void) => Promise<string>;
   /** Release the session's memory. The conversation so far is forgotten. */
   destroy: () => void;
 };
+
+/** How one stage's warm-up at page load went. */
+export type WarmUpResult =
+  | { state: "ready"; ms: number }
+  /** The model isn't downloaded yet, so it will load on first use instead. */
+  | { state: "skipped" }
+  | { state: "failed"; message: string };
+
+/** One result per pipeline stage; each settles independently. */
+export type WarmUp = Record<"stt" | "llm" | "tts", Promise<WarmUpResult>>;
 
 export type Models = {
   /** Terminate the workers and the LLM session, releasing the RAM/GPU memory they hold. */

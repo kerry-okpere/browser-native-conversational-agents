@@ -1,5 +1,5 @@
 import { createLlm } from "./pipeline/llm";
-import { Stt, Settle, Speak, Models } from "./pipeline/index.type";
+import { Stt, Settle, Speak, Models, WarmUp, WarmUpResult } from "./pipeline/index.type";
 
 export function init() {
   let nextId = 0;
@@ -7,7 +7,10 @@ export function init() {
   // TTS Entry
   // Workers are created on first use so they can be terminated and recreated.
   let ttsWorker: Worker | null = null;
-  const pending = new Map<number, Settle<void> & { onProgress?: Parameters<Speak>[1] }>();
+  const pending = new Map<number, Settle<void> & {
+    onProgress?: Parameters<Speak>[1];
+    silent?: boolean; // generate the audio but don't play it (used to warm up)
+  }>();
 
   function getTtsWorker() {
     if (ttsWorker) return ttsWorker;
@@ -29,7 +32,7 @@ export function init() {
 
       pending.delete(id);
       if (type === "tts:audio") {
-        new Audio(URL.createObjectURL(event.data.audio)).play();
+        if (!request.silent) new Audio(URL.createObjectURL(event.data.audio)).play();
         request.resolve();
       } else {
         request.reject(new Error(event.data.message));
@@ -39,12 +42,14 @@ export function init() {
     return ttsWorker;
   }
 
-  const speak: Speak = (text, onProgress) =>
-    new Promise((resolve, reject) => {
+  const synthesize = (text: string, options: { onProgress?: Parameters<Speak>[1]; silent?: boolean } = {}) =>
+    new Promise<void>((resolve, reject) => {
       const id = nextId++;
-      pending.set(id, { onProgress, resolve, reject });
+      pending.set(id, { ...options, resolve, reject });
       getTtsWorker().postMessage({ id, text });
     });
+
+  const speak: Speak = (text, onProgress) => synthesize(text, { onProgress });
 
   // STT Entry
   let sttWorker: Worker | null = null;
@@ -117,6 +122,45 @@ export function init() {
   // LLM Entry
   const llm = createLlm();
 
+  // Warm up
+  // Each stage warms up at page load only if its model is already downloaded,
+  const isSttDownloaded = async () =>
+    (await caches.has("transformers-cache")) &&
+    (await (await caches.open("transformers-cache")).keys()).length > 0;
+
+  const isTtsDownloaded = async () => {
+    try {
+      const root = await navigator.storage.getDirectory();
+      const piper = await root.getDirectoryHandle("piper");
+      for await (const name of piper.keys()) {
+        if (name.endsWith(".onnx")) return true;
+      }
+    } catch {
+      // no "piper" folder yet
+    }
+    return false;
+  };
+
+  const warm = async (
+    isDownloaded: () => Promise<boolean>,
+    run: () => Promise<unknown>,
+  ): Promise<WarmUpResult> => {
+    try {
+      if (!(await isDownloaded())) return { state: "skipped" };
+      const started = performance.now();
+      await run();
+      return { state: "ready", ms: performance.now() - started };
+    } catch (error) {
+      return { state: "failed", message: (error as Error).message };
+    }
+  };
+
+  const warmUp: WarmUp = {
+    stt: warm(isSttDownloaded, () => stt.load()),
+    llm: warm(async () => (await llm.availability()) === "available", () => llm.warmUp()),
+    tts: warm(isTtsDownloaded, () => synthesize("Hi", { silent: true })),
+  };
+
   // Model lifecycle
   const models: Models = {
     freeMemory() {
@@ -153,5 +197,5 @@ export function init() {
     },
   };
 
-  return { speak, stt, llm, models };
+  return { speak, stt, llm, models, warmUp };
 }
