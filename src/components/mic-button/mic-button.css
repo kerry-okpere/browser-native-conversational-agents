@@ -1,0 +1,32 @@
+.mic {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 420px;
+  margin-top: 1rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.5rem;
+}
+
+button.recording {
+  background: #c62828;
+  color: white;
+  border-color: #c62828;
+}
+
+progress {
+  width: 100%;
+}
+
+.status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #555;
+}
+
+.transcript {
+  margin: 0;
+  min-height: 1.5em;
+}

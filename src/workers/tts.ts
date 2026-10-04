@@ -8,10 +8,10 @@ self.addEventListener("message", async (event: MessageEvent<{ id: number; text: 
 
   try {
     const audio = await tts.predict({ text, voiceId: VOICE_ID }, ({ loaded, total }) => {
-      self.postMessage({ id, type: "progress", loaded, total });
+      self.postMessage({ id, type: "tts:progress", loaded, total });
     });
-    self.postMessage({ id, type: "audio", audio });
+    self.postMessage({ id, type: "tts:audio", audio });
   } catch (error) {
-    self.postMessage({ id, type: "error", message: (error as Error).message });
+    self.postMessage({ id, type: "tts:error", message: (error as Error).message });
   }
 });
