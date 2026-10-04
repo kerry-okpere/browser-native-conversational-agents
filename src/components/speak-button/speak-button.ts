@@ -1,6 +1,6 @@
 import html from './speak-button.html?raw';
 import css from './speak-button.css?inline';
-import type { Speak } from '../../init';
+import type { Speak } from '../../pipeline/index.type';
 
 const toMB = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 

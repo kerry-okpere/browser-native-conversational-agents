@@ -1,4 +1,5 @@
 body {
   font-family: system-ui, sans-serif;
   margin: 2rem;
+  padding-bottom: 4rem; /* room for the fixed model-controls bar */
 }

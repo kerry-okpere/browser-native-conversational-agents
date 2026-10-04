@@ -1,27 +1,5 @@
-import type { Progress } from "@diffusionstudio/vits-web";
-
-export type Speak = (
-  text: string,
-  onProgress?: (progress: Pick<Progress, "loaded" | "total">) => void,
-) => Promise<void>;
-
-export type Stt = {
-  /** Whether the model is loaded and warmed up. */
-  readonly loaded: boolean;
-  /** Download and warm up the model. Safe to call more than once. */
-  load: (onProgress?: (percentage: number) => void) => Promise<void>;
-  /** Transcribe 16 kHz mono samples. */
-  transcribe: (audio: Float32Array) => Promise<string>;
-};
-
-export type Models = {
-  /** Terminate the workers, releasing the RAM/GPU memory their models hold. */
-  freeMemory: () => void;
-  /** Free memory, then delete the downloaded model files from this site's storage. */
-  deleteDownloads: () => Promise<void>;
-};
-
-type Settle<T> = { resolve: (value: T) => void; reject: (error: Error) => void };
+import { createLlm } from "./pipeline/llm";
+import { Stt, Settle, Speak, Models } from "./pipeline/index.type";
 
 export function init() {
   let nextId = 0;
@@ -136,6 +114,9 @@ export function init() {
       }),
   };
 
+  // LLM Entry
+  const llm = createLlm();
+
   // Model lifecycle
   const models: Models = {
     freeMemory() {
@@ -143,6 +124,7 @@ export function init() {
       sttWorker?.terminate();
       ttsWorker = null;
       sttWorker = null;
+      llm.destroy();
 
       // Anything still in flight will never get a reply.
       const error = new Error("Models were unloaded");
@@ -171,5 +153,5 @@ export function init() {
     },
   };
 
-  return { speak, stt, models };
+  return { speak, stt, llm, models };
 }

@@ -1,0 +1,70 @@
+.chat {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 420px;
+  margin-top: 1rem;
+}
+
+.messages {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.message {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  max-width: 85%;
+  white-space: pre-wrap;
+}
+
+.user {
+  justify-self: end;
+  background: #1a73e8;
+  color: white;
+}
+
+.assistant {
+  justify-self: start;
+  background: #eee;
+}
+
+form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input {
+  flex: 1;
+  min-width: 0;
+}
+
+input,
+button {
+  font: inherit;
+  padding: 0.5rem;
+}
+
+progress {
+  width: 100%;
+}
+
+.status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #555;
+}
+
+.meta {
+  margin: -0.25rem 0 0;
+  font-size: 0.75rem;
+  color: #777;
+}
+
+.meta-user {
+  justify-self: end;
+}
+
+.meta-assistant {
+  justify-self: start;
+}

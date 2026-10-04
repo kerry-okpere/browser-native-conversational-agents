@@ -1,6 +1,6 @@
 import html from './model-controls.html?raw';
 import css from './model-controls.css?inline';
-import type { Models } from '../../init';
+import type { Models } from '../../pipeline/index.type';
 
 const toMB = (bytes = 0) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 

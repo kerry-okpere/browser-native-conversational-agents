@@ -1,6 +1,6 @@
 import html from './mic-button.html?raw';
 import css from './mic-button.css?inline';
-import type { Stt } from '../../init';
+import type { Stt } from '../../pipeline/index.type';
 
 const SAMPLE_RATE = 16000; // what the speech model expects
 
