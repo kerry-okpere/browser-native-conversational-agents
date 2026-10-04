@@ -15,6 +15,7 @@
   "dependencies": {
     "@diffusionstudio/vits-web": "^1.0.3",
     "@huggingface/transformers": "^4.3.0",
-    "@types/dom-chromium-ai": "^0.0.17"
+    "@types/dom-chromium-ai": "^0.0.17",
+    "kokoro-js": "^1.2.1"
   }
 }

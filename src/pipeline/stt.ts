@@ -1,8 +1,9 @@
 // STT stage
 import type { Settle, Stt } from "./index.type";
+import { TRANSFORMERS_CACHE, deleteCached, hasCached } from "./cache";
 
-// Where Transformers.js keeps its downloaded model files.
-const CACHE = "transformers-cache";
+// Matches the model's files in the cache, which other models share.
+const MODEL = "whisper-tiny";
 
 export function createStt(): Stt {
   // The worker is created on first use so it can be terminated and recreated.
@@ -82,8 +83,7 @@ export function createStt(): Stt {
     get loaded() {
       return loaded;
     },
-    isDownloaded: async () =>
-      (await caches.has(CACHE)) && (await (await caches.open(CACHE)).keys()).length > 0,
+    isDownloaded: () => hasCached(TRANSFORMERS_CACHE, MODEL),
     load,
     // The worker already runs the model once on silence as part of loading.
     warmUp: () => load(),
@@ -96,7 +96,7 @@ export function createStt(): Stt {
     destroy,
     async deleteDownloads() {
       destroy(); // the worker may hold the files open
-      await caches.delete(CACHE);
+      await deleteCached(TRANSFORMERS_CACHE, MODEL);
     },
   };
 }

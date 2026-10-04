@@ -1,13 +1,13 @@
 import { createStt } from "./pipeline/stt";
 import { createLlm } from "./pipeline/llm";
-import { createTts } from "./pipeline/tts";
-import type { Models, Stage, WarmUp, WarmUpResult } from "./pipeline/index.type";
+import type { Models, Stage, Tts, WarmUp, WarmUpResult } from "./pipeline/index.type";
+import { KokoroTts } from "./pipeline/tts/kokoro.tts";
 
 export function init() {
   // Pipeline stages. Each one shares the same lifecycle (see `Stage`).
   const stt = createStt();
   const llm = createLlm();
-  const tts = createTts();
+  const tts: Tts = new KokoroTts() // PiperTTS can be deployed as TTS variant new PiperTts();
 
   // Warm up
   // Each stage warms up at page load only if its model is already downloaded,
