@@ -1,0 +1,23 @@
+.controls {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 2rem;
+  border-top: 1px solid #ccc;
+  background: white;
+}
+
+button {
+  font: inherit;
+  padding: 0.5rem;
+}
+
+.status {
+  font-size: 0.875rem;
+  color: #555;
+}

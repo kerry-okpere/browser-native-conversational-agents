@@ -29,15 +29,13 @@ export class MicButton extends HTMLElement {
     const transcript = root.querySelector('.transcript')!;
 
     let recorder: MediaRecorder | null = null;
-    let loaded = false;
 
     const loadModel = (stt: Stt) =>
       stt.load((percentage) => {
-        if (loaded) return;
+        if (stt.loaded) return;
         progress.hidden = false;
         progress.value = percentage;
-      }).then(() => {
-        loaded = true;
+      }).finally(() => {
         progress.hidden = true;
       });
 
@@ -54,7 +52,7 @@ export class MicButton extends HTMLElement {
         button.disabled = true;
 
         try {
-          status.textContent = loaded ? 'Transcribing…' : 'Loading speech model…';
+          status.textContent = stt.loaded ? 'Transcribing…' : 'Loading speech model…';
           await loadModel(stt);
           status.textContent = 'Transcribing…';
           const samples = await toSamples(new Blob(chunks, { type: chunks[0]?.type }));
