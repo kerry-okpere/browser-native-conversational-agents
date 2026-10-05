@@ -20,7 +20,11 @@ function handleProgress(info: ProgressInfo): void {
 // Loads the model once; later calls reuse the same instance.
 function load() {
   transcriber ??= (async () => {
+    const gpu = await (navigator as any).gpu?.requestAdapter().catch(() => null);
+
     const asr = await pipeline("automatic-speech-recognition", MODEL_ID, {
+      device: { encoder_model: gpu ? "webgpu" : "wasm", decoder_model_merged: "wasm" },
+      dtype: { encoder_model: gpu ? "fp32" : "q8", decoder_model_merged: "q8" },
       progress_callback: handleProgress,
     });
     // Warm up on one second of silence so the first real request isn't slow.
