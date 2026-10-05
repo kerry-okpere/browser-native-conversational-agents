@@ -1,8 +1,5 @@
 // Helpers for model files kept in the browser's Cache Storage.
 
-/** Where Transformers.js keeps downloaded model files. Shared by every model that uses it. */
-export const TRANSFORMERS_CACHE = "transformers-cache";
-
 /**
  * Whether the cache holds a model's weights: a `.onnx` or any file whose url is a match
  */

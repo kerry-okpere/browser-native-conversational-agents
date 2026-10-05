@@ -1,16 +1,8 @@
 import html from './start-button.html?raw';
 import css from './start-button.css?inline';
 import type { StageName, Start, StartUpdate, WarmUp, WarmUpResult } from '../../pipeline/index.type';
-
-const toSeconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
-
-const NAMES: Record<StageName, string> = {
-  stt: 'Speech-to-text',
-  llm: 'LLM',
-  tts: 'Text-to-speech',
-};
-
-const toMB = (bytes = 0) => `${Math.round(bytes / 1024 / 1024)} MB`;
+import { STAGE_LABELS } from '../../constants';
+import { toMB, toSeconds } from '../../helpers';
 
 // What a row shows: the page-load warm-up result first, then Start's progress.
 type RowState = StartUpdate | WarmUpResult;
@@ -57,7 +49,7 @@ export class StartButton extends HTMLElement {
       await this.start((stage, update) => {
         this.setRow(stage, update);
         failed ||= update.state === 'failed';
-        if (update.state === 'ready' && !update.saved) unsaved.push(NAMES[stage]);
+        if (update.state === 'ready' && !update.saved) unsaved.push(STAGE_LABELS[stage]);
       });
 
       // A model that loaded but isn't on the device afterwards didn't fit in

@@ -1,8 +1,7 @@
 import html from './model-controls.html?raw';
 import css from './model-controls.css?inline';
 import type { Models } from '../../pipeline/index.type';
-
-const toMB = (bytes = 0) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+import { toMB } from '../../helpers';
 
 export class ModelControls extends HTMLElement {
   models?: Models;

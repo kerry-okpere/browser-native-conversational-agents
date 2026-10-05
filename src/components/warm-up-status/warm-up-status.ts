@@ -1,8 +1,7 @@
 import html from './warm-up-status.html?raw';
 import css from './warm-up-status.css?inline';
 import type { WarmUp, WarmUpResult } from '../../pipeline/index.type';
-
-const toSeconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
+import { toSeconds } from '../../helpers';
 
 const describe = (result: WarmUpResult) => {
   switch (result.state) {

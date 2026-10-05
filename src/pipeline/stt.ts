@@ -1,6 +1,7 @@
 // STT stage
 import type { Settle, Stt } from "./index.type";
-import { TRANSFORMERS_CACHE, deleteCached, hasCached } from "./cache";
+import { TRANSFORMERS_CACHE } from "../constants";
+import { deleteCached, hasCached } from "./cache";
 
 // Matches the model's files in the cache, which other models share.
 const MODEL = "whisper-tiny";

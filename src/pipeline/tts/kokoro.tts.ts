@@ -1,4 +1,5 @@
-import { TRANSFORMERS_CACHE, deleteCached, hasCached } from "../cache";
+import { TRANSFORMERS_CACHE } from "../../constants";
+import { deleteCached, hasCached } from "../cache";
 import { TtsEngine } from "./index.tts";
 
 /** Kokoro-82M via kokoro-js. Uses WebGPU when available. */

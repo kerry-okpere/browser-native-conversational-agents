@@ -68,3 +68,9 @@ progress {
 .meta-assistant {
   justify-self: start;
 }
+
+.mic.recording {
+  background: #c62828;
+  color: white;
+  border-color: #c62828;
+}

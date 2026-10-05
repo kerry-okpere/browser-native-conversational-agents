@@ -13,5 +13,6 @@ document.querySelector("start-button")!.warmUp = warmUp;
 // document.querySelector('speak-button')!.tts = tts;
 // document.querySelector('mic-button')!.stt = stt;
 document.querySelector("chat-box")!.llm = llm;
+document.querySelector("chat-box")!.stt = stt;
 document.querySelector("chat-box")!.onReply = (text) => tts.speak(text);
 document.querySelector("model-controls")!.models = models;

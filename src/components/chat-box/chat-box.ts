@@ -1,12 +1,12 @@
 import html from './chat-box.html?raw';
 import css from './chat-box.css?inline';
-import type { Llm } from '../../pipeline/index.type';
-
-const toSeconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
-const timestamp = () => new Date().toLocaleTimeString([], { hour12: false });
+import type { Llm, Stt } from '../../pipeline/index.type';
+import { timestamp, toSamples, toSeconds } from '../../helpers';
 
 export class ChatBox extends HTMLElement {
   llm?: Llm;
+  /** Lets the Speak button record a message and send its transcript. */
+  stt?: Stt;
   /**
    * Called with the finished reply, for example to speak it. If it returns a
    * promise, the time it resolves is shown as "First sound".
@@ -20,7 +20,8 @@ export class ChatBox extends HTMLElement {
     const messages = root.querySelector('.messages')!;
     const form = root.querySelector('form')!;
     const input = root.querySelector('input')!;
-    const button = root.querySelector('button')!;
+    const button = root.querySelector<HTMLButtonElement>('.send')!;
+    const mic = root.querySelector<HTMLButtonElement>('.mic')!;
     const progress = root.querySelector('progress')!;
     const status = root.querySelector('.status')!;
 
@@ -64,15 +65,12 @@ export class ChatBox extends HTMLElement {
       progress.hidden = true;
     };
 
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
 
-      const text = input.value.trim();
+    const send = async (text: string, note = '') => {
       if (!this.llm || !text) return;
 
-      input.value = '';
-      input.disabled = button.disabled = true;
-      addMessage('user', text).meta.textContent = timestamp();
+      input.disabled = button.disabled = mic.disabled = true;
+      addMessage('user', text).meta.textContent = timestamp() + note;
 
       // when the message was sent.
       const sent = performance.now();
@@ -117,8 +115,76 @@ export class ChatBox extends HTMLElement {
         progress.hidden = true;
         status.textContent = `Error: ${(error as Error).message}`;
       } finally {
-        input.disabled = button.disabled = false;
+        input.disabled = button.disabled = mic.disabled = false;
         input.focus();
+      }
+    };
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const text = input.value.trim();
+      input.value = '';
+      send(text);
+    });
+
+    // Speak: click to start recording, click again to stop, transcribe and send.
+    let recorder: MediaRecorder | null = null;
+
+    const record = async (stt: Stt) => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const chunks: Blob[] = [];
+
+      recorder = new MediaRecorder(stream);
+      recorder.addEventListener('dataavailable', (event) => chunks.push(event.data));
+      recorder.addEventListener('stop', async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        recorder = null;
+        mic.classList.remove('recording');
+        mic.textContent = 'Speak';
+        mic.disabled = true;
+
+        try {
+          const stopped = performance.now();
+          status.textContent = stt.loaded ? 'Transcribing…' : 'Loading speech model…';
+          await stt.load();
+          status.textContent = 'Transcribing…';
+
+          const samples = await toSamples(new Blob(chunks, { type: chunks[0]?.type }));
+          const text = (await stt.transcribe(samples)).trim();
+          status.textContent = '';
+
+          // Whisper marks silence with tags like "[BLANK_AUDIO]".
+          if (!text || /^\[.*\]$/.test(text)) {
+            status.textContent = "Didn't catch that, try again.";
+            return;
+          }
+          await send(text, ` · Transcribed in ${toSeconds(performance.now() - stopped)}`);
+        } catch (error) {
+          status.textContent = `Error: ${(error as Error).message}`;
+        } finally {
+          mic.disabled = false;
+        }
+      });
+
+      recorder.start();
+      mic.classList.add('recording');
+      mic.textContent = 'Stop';
+      status.textContent = 'Listening… press Stop when you are done.';
+    };
+
+    mic.addEventListener('click', async () => {
+      if (!this.stt) return;
+
+      if (recorder) {
+        recorder.stop();
+        return;
+      }
+
+      try {
+        await record(this.stt);
+      } catch (error) {
+        status.textContent = `Microphone error: ${(error as Error).message}`;
       }
     });
   }

@@ -1,20 +1,7 @@
 import html from './mic-button.html?raw';
 import css from './mic-button.css?inline';
 import type { Stt } from '../../pipeline/index.type';
-
-const SAMPLE_RATE = 16000; // what the speech model expects
-
-/** Decode a recording into 16 kHz mono samples. */
-async function toSamples(recording: Blob): Promise<Float32Array> {
-  // decodeAudioData resamples to the context's sample rate.
-  const context = new AudioContext({ sampleRate: SAMPLE_RATE });
-  try {
-    const buffer = await context.decodeAudioData(await recording.arrayBuffer());
-    return buffer.getChannelData(0);
-  } finally {
-    await context.close();
-  }
-}
+import { toSamples } from '../../helpers';
 
 export class MicButton extends HTMLElement {
   stt?: Stt;

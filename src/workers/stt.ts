@@ -3,9 +3,9 @@ import {
   type AutomaticSpeechRecognitionPipeline,
   type ProgressInfo,
 } from "@huggingface/transformers";
+import { SAMPLE_RATE } from "../constants";
 
 const MODEL_ID = "Xenova/whisper-tiny";
-const SAMPLE_RATE = 16000; // Whisper expects 16 kHz mono
 let transcriber: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 
 function handleProgress(info: ProgressInfo): void {
