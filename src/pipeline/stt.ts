@@ -104,6 +104,13 @@ export function createStt(): Stt {
         getWorker().postMessage({ type: "stt:generate", id, data: audio });
       }),
     destroy,
+    async deleteUnused() {
+      // With a GPU the encoder runs from the full-precision file, so the CPU copy is dead weight.
+      const gpu = await (navigator as any).gpu?.requestAdapter().catch(() => null);
+      if (gpu) {
+        await deleteCached(TRANSFORMERS_CACHE, `${MODEL}/resolve/main/onnx/encoder_model_quantized.onnx`);
+      }
+    },
     async deleteDownloads() {
       destroy(); // the worker may hold the files open
       await deleteCached(TRANSFORMERS_CACHE, MODEL);
