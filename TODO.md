@@ -3,8 +3,8 @@
 ## Browser-based TTS options
 
 - **Web Speech API** (`speechSynthesis`) — native, zero download, quality varies by OS/browser
-- **Piper** (current — [`tts.ts`](src/workers/tts.ts) via `@diffusionstudio/vits-web`) — solid quality, ~20-60MB per voice, no cloning
-- **Kokoro-82M** (`kokoro-js`) — better quality than Piper, ~80-300MB, WebGPU or WASM
+- **Piper** ([`tts-piper.ts`](src/workers/tts-piper.ts) via `@diffusionstudio/vits-web`) — solid quality, ~20-60MB per voice, no cloning
+- **Kokoro-82M** (current — [`tts-kokoro.ts`](src/workers/tts-kokoro.ts) via `kokoro-js`) — better quality than Piper, ~80-300MB, WebGPU or WASM
 - **Transformers.js** (MMS-TTS, SpeechT5, etc.) — flexible, quality varies by model
 - **Bark / StyleTTS2 / XTTS** — best quality, some support cloning, but large and mostly research demos, not turnkey
 
@@ -12,11 +12,14 @@ None of these give real voice cloning out of the box — see Voice Cloning below
 
 ## Pipeline stages
 
-- [ ] **STT (speech-to-text)** — transcribe user speech to text, in a dedicated worker (e.g. `src/workers/stt.ts`), following the same Worker + `postMessage` pattern as `tts.ts`.
-- [ ] **VAD (voice activity detection)** — detect when the user starts/stops speaking, to drive recording start/stop without push-to-talk.
-- [ ] **Turn detection** — decide when the user has finished their turn (vs. a mid-sentence pause), so the agent knows when to respond.
-- [ ] **LLM + tool calling** — run an in-browser LLM (WebGPU-accelerated) that can call tools/functions, wired to take STT output and produce a response for TTS.
-- [ ] **Wire the full loop** — STT → VAD/turn detection → LLM (+ tools) → TTS, as one conversational pipeline.
+- [x] **STT (speech-to-text)** — Whisper via Transformers.js in `src/workers/stt.ts`, encoder on WebGPU.
+- [x] **VAD (voice activity detection)** — Silero VAD in `src/workers/vad.ts`; the turn ends after a fixed 0.5 s of silence.
+- [x] **Wire the full loop** — VAD → STT → LLM → TTS in `src/pipeline/call.ts`, hands-free.
+- [ ] **Turn detection** — decide when the user has finished their turn (vs. a mid-sentence pause) instead of a fixed silence. Candidate: [Smart Turn v3](https://huggingface.co/pipecat-ai/smart-turn-v3), run when the VAD reports silence.
+- [ ] **Interruptions (barge-in)** — the microphone is ignored while the agent is thinking or speaking. Let the user cut in by speaking, which needs reliable echo cancellation first.
+- [ ] **Speak while generating** — send each sentence to TTS as soon as it is complete instead of waiting for the whole reply.
+- [ ] **Tool calling** — let the LLM call tools/functions (the Prompt API has none built in; use structured output).
+- [ ] **Agent ends the call** — expose "end call" as a tool so the agent can end the session itself. Depends on tool calling.
 
 ## Voice cloning
 

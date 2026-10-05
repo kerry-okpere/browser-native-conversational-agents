@@ -1,0 +1,50 @@
+/* Base styles every component starts from. */
+:host {
+  display: block;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: white;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+button:disabled,
+input:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: white;
+}
+
+button.danger {
+  color: var(--danger);
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+progress {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--ink);
+}

@@ -1,5 +1,54 @@
+/* Design tokens. Components read these through their shadow roots. */
+:root {
+  --ink: #111827;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --surface: #f6f7f9;
+  --accent: #2563eb;
+  --ok: #15803d;
+  --danger: #b91c1c;
+  --radius: 10px;
+}
+
 body {
+  margin: 0;
   font-family: system-ui, sans-serif;
-  margin: 2rem;
-  padding-bottom: 4rem; /* room for the fixed model-controls bar */
+  color: var(--ink);
+  background: white;
+}
+
+main {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 3rem 1.25rem;
+}
+
+/* The call view is wider than the start screen: orb on the left, chat on the right. */
+body:not([data-call="idle"]) main {
+  max-width: 880px;
+}
+
+.call {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  align-items: center;
+  gap: 2rem;
+}
+
+.stage {
+  display: grid;
+  gap: 1.5rem;
+}
+
+/* On a narrow screen the chat goes under the orb. */
+@media (max-width: 720px) {
+  .call {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Start screen while idle, call view otherwise. */
+body[data-call="idle"] .call,
+body:not([data-call="idle"]) start-button {
+  display: none;
 }
