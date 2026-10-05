@@ -23,6 +23,15 @@ export function createStt(): Stt {
       { type: "module" },
     );
 
+    // A worker that crashes sends no message, so without this a load would wait forever.
+    worker.addEventListener("error", (event) => {
+      const error = new Error(event.message || "Speech-to-text worker crashed");
+      if (!loaded) ready?.reject(error);
+      loading = null;
+      for (const request of transcriptions.values()) request.reject(error);
+      transcriptions.clear();
+    });
+
     worker.addEventListener("message", (event: MessageEvent) => {
       const { status, id } = event.data;
 

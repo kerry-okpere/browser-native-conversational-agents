@@ -7,6 +7,11 @@ const timestamp = () => new Date().toLocaleTimeString([], { hour12: false });
 
 export class ChatBox extends HTMLElement {
   llm?: Llm;
+  /**
+   * Called with the finished reply, for example to speak it. If it returns a
+   * promise, the time it resolves is shown as "First sound".
+   */
+  onReply?: (text: string) => void | Promise<void>;
 
   connectedCallback() {
     const root = this.attachShadow({ mode: 'open' });
@@ -99,6 +104,15 @@ export class ChatBox extends HTMLElement {
           (needsLoad ? ` (model load ${toSeconds(loadTime)})` : '') +
           ` · Full reply ${toSeconds(sinceSent())}`;
         status.textContent = '';
+
+        // Hand the finished reply on without holding up the next message.
+        Promise.resolve(this.onReply?.(full.trim()))
+          .then(() => {
+            if (this.onReply) reply.meta.textContent += ` · First sound ${toSeconds(sinceSent())}`;
+          })
+          .catch((error) => {
+            status.textContent = `Speech failed: ${(error as Error).message}`;
+          });
       } catch (error) {
         progress.hidden = true;
         status.textContent = `Error: ${(error as Error).message}`;

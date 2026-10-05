@@ -21,11 +21,13 @@ export class SpeakButton extends HTMLElement {
       status.textContent = 'Generating speech…';
 
       try {
-        // Progress only fires the first time, while the voice model downloads.
+        // Reading the model back from the browser's cache reports progress too,
+        // so check first whether this is a real download.
+        const verb = (await this.tts.isDownloaded()) ? 'Loading' : 'Downloading';
         await this.tts.load((fraction) => {
           progress.hidden = false;
           progress.value = fraction;
-          status.textContent = `Downloading voice… ${Math.floor(fraction * 100)}%`;
+          status.textContent = `${verb} voice… ${Math.floor(fraction * 100)}%`;
         });
         progress.hidden = true;
         status.textContent = 'Generating speech…';

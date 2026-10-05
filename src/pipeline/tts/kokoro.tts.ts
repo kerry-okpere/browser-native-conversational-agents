@@ -8,7 +8,7 @@ export class KokoroTts extends TtsEngine {
 
   protected createWorker() {
     return new Worker(
-      new URL("../workers/tts-kokoro.ts", import.meta.url),
+      new URL("../../workers/tts-kokoro.ts", import.meta.url),
       { type: "module" },
     );
   }

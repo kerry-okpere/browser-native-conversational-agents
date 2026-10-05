@@ -55,6 +55,28 @@ export type Tts = Stage & {
   deleteDownloads: () => Promise<void>;
 };
 
+export type StageName = "stt" | "llm" | "tts";
+
+/** Where one stage has got to after Start was pressed. */
+export type StartUpdate =
+  | { state: "downloading"; fraction: number }
+  /** Files are on the device; loading into memory and warming up. */
+  | { state: "loading" }
+  /**
+   * `saved` is false when the model could not be stored on the
+   * device (the browser's storage limit is too small 306MB), so it will download
+   * again after a reload.
+   */
+  | { state: "ready"; ms: number; saved: boolean }
+  | { state: "failed"; message: string };
+
+/**
+ * Download (if needed), load and warm up every stage. `onUpdate` reports each
+ * stage's progress. Must be called from a click, because Chrome only starts
+ * the LLM's download in response to a user gesture.
+ */
+export type Start = (onUpdate: (stage: StageName, update: StartUpdate) => void) => Promise<void>;
+
 /** How one stage's warm-up at page load went. */
 export type WarmUpResult =
   | { state: "ready"; ms: number }

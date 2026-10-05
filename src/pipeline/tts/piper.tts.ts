@@ -6,7 +6,7 @@ export class PiperTts extends TtsEngine {
 
   protected createWorker() {
     return new Worker(
-      new URL("../workers/tts-piper.ts", import.meta.url),
+      new URL("../../workers/tts-piper.ts", import.meta.url),
       { type: "module" },
     );
   }

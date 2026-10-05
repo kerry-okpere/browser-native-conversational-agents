@@ -88,6 +88,16 @@ export abstract class TtsEngine implements Tts {
     if (this.worker) return this.worker;
 
     this.worker = this.createWorker();
+
+    // Without this loading model would wait forever because A worker may have crashed with no message
+    this.worker.addEventListener("error", (event) => {
+      const error = new Error(event.message || "Text-to-speech worker crashed");
+      if (!this.isLoaded) this.ready?.reject(error);
+      this.loading = null;
+      for (const request of this.generations.values()) request.reject(error);
+      this.generations.clear();
+    });
+
     this.worker.addEventListener("message", (event: MessageEvent) => {
       const { status, id } = event.data;
 
