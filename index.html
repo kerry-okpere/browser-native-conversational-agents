@@ -5,10 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Browser Native Conversational Agents</title>
   </head>
-  <body>
-    <start-button></start-button>
-    <chat-box></chat-box>
-    <model-controls></model-controls>
+  <body data-call="idle">
+    <main>
+      <start-button></start-button>
+      <section class="call">
+        <div class="stage">
+          <voice-orb></voice-orb>
+          <call-controls></call-controls>
+        </div>
+        <chat-box></chat-box>
+      </section>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -16,7 +16,10 @@ const describeUser = (message: UserMessage) =>
     message.at,
     message.finalSegment !== undefined
       ? `${ORIGIN.speech}: ${metric(METRICS.finalSegment, message.finalSegment)}` +
-        ` (waiting for silence ${toSeconds(message.vadWait ?? 0)})`
+        ` (waiting for silence ${toSeconds(message.vadWait ?? 0)}` +
+        (message.turn
+          ? `, turn judged ${Math.round(message.turn.probability * 100)}% finished in ${toSeconds(message.turn.ms)})`
+          : ', ended by silence)')
       : '',
   ]);
 

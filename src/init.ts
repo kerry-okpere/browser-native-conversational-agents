@@ -1,13 +1,22 @@
+import { createVad } from "./pipeline/vad";
+import { createTurn } from "./pipeline/turn";
 import { createStt } from "./pipeline/stt";
 import { createLlm } from "./pipeline/llm";
-import type { Models, Stage, StageName, Start, Tts, WarmUp, WarmUpResult } from "./pipeline/index.type";
 import { KokoroTts } from "./pipeline/tts/kokoro.tts";
+import { PiperTts } from "./pipeline/tts/piper.tts";
+import { VoiceCall } from "./pipeline/call";
+import type { Stage, StageName, Start, Tts, WarmUp, WarmUpResult } from "./pipeline/index.type";
 
 export function init() {
   // Pipeline stages. Each one shares the same lifecycle (see `Stage`).
+  const vad = createVad();
+  const turn = createTurn();
   const stt = createStt();
   const llm = createLlm();
   const tts: Tts = new KokoroTts() // PiperTTS can be deployed as TTS variant new PiperTts();
+
+  const stages: Record<StageName, Stage> = { vad, turn, stt, llm, tts };
+  const names = Object.keys(stages) as StageName[];
 
   // Warm up
   // Each stage warms up at page load only if its model is already downloaded,
@@ -23,10 +32,13 @@ export function init() {
     }
   };
 
-  const warmUp: WarmUp = {
-    stt: warm(stt),
-    llm: warm(llm),
-    tts: warm(tts),
+  const warmUp = Object.fromEntries(names.map((name) => [name, warm(stages[name])])) as WarmUp;
+
+  // Storage held by models that are no longer used: the TTS engine that isn't
+  // selected, and files from an older STT configuration.
+  const deleteUnused = async () => {
+    const otherTts = tts instanceof KokoroTts ? new PiperTts() : new KokoroTts();
+    await Promise.all([otherTts.deleteDownloads(), stt.deleteUnused()]);
   };
 
   // Start
@@ -53,27 +65,13 @@ export function init() {
       }
     };
 
-    await Promise.all([
-      startStage("stt", stt),
-      startStage("llm", llm),
-      startStage("tts", tts),
-    ]);
+    // Make room first, so new downloads fit in the site's storage quota.
+    await deleteUnused().catch((error) => console.error("[storage]", error));
+    await Promise.all(names.map((name) => startStage(name, stages[name])));
   };
 
-  // Model lifecycle
-  const models: Models = {
-    freeMemory() {
-      stt.destroy();
-      llm.destroy();
-      tts.destroy();
-    },
-    async deleteDownloads() {
-      // Chrome owns the LLM's model, so a page can only unload it, not delete it.
-      llm.destroy();
-      await stt.deleteDownloads();
-      await tts.deleteDownloads();
-    },
-  };
+  // The conversation: VAD -> STT -> LLM -> TTS
+  const call = new VoiceCall({ vad, turn, stt, llm, tts });
 
-  return { stt, llm, tts, models, warmUp, start };
+  return { call, warmUp, start };
 }

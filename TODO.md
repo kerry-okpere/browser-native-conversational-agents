@@ -13,11 +13,12 @@ None of these give real voice cloning out of the box — see Voice Cloning below
 ## Pipeline stages
 
 - [x] **STT (speech-to-text)** — Whisper via Transformers.js in `src/workers/stt.ts`, encoder on WebGPU.
-- [x] **VAD (voice activity detection)** — Silero VAD in `src/workers/vad.ts`; the turn ends after a fixed 0.5 s of silence.
+- [x] **VAD (voice activity detection)** — Silero VAD in `src/workers/vad.ts`.
 - [x] **Wire the full loop** — VAD → STT → LLM → TTS in `src/pipeline/call.ts`, hands-free.
-- [ ] **Turn detection** — decide when the user has finished their turn (vs. a mid-sentence pause) instead of a fixed silence. Candidate: [Smart Turn v3](https://huggingface.co/pipecat-ai/smart-turn-v3), run when the VAD reports silence.
+- [x] **Turn detection** — [Smart Turn v3](https://huggingface.co/pipecat-ai/smart-turn-v3) in `src/workers/turn.ts`. After 0.2 s of silence it judges whether the user has finished; a 2.5 s silence ends the turn regardless.
+- [ ] **Faster turn check** — a check takes about 0.2 s in the browser against the 12 ms the model's authors report. Find where the time goes (spectrogram in JS, single-threaded WASM) and reduce it.
 - [ ] **Interruptions (barge-in)** — the microphone is ignored while the agent is thinking or speaking. Let the user cut in by speaking, which needs reliable echo cancellation first.
-- [ ] **Speak while generating** — send each sentence to TTS as soon as it is complete instead of waiting for the whole reply.
+- [x] **Speak while generating** — each sentence goes to TTS as soon as it is complete, in `src/pipeline/call.ts`.
 - [ ] **Tool calling** — let the LLM call tools/functions (the Prompt API has none built in; use structured output).
 - [ ] **Agent ends the call** — expose "end call" as a tool so the agent can end the session itself. Depends on tool calling.
 
