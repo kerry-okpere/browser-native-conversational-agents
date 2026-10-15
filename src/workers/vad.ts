@@ -18,6 +18,9 @@ let utterance: Float32Array[] = []; // frames of the turn in progress
 let previous: Float32Array[] = []; // the last few frames before speech began
 let speechSamples = 0;
 let silentSamples = 0;
+let turnDetection = false;
+let asked = false; // whether the current pause has already been asked about
+let pauseId = 0; // identifies the current pause, so a late answer about an older one is ignored
 
 async function probability(frame: Float32Array) {
   const run = await load();
@@ -61,8 +64,16 @@ function reset() {
   previous = [];
   speechSamples = 0;
   silentSamples = 0;
+  asked = false;
+  pauseId++;
   state = freshState();
 }
+
+const joined = (frames: Float32Array[]) => {
+  const audio = new Float32Array(frames.length * VAD.frame);
+  frames.forEach((frame, index) => audio.set(frame, index * VAD.frame));
+  return audio;
+};
 
 function endTurn() {
   const frames = utterance;
@@ -73,6 +84,8 @@ function endTurn() {
   utterance = [];
   speechSamples = 0;
   silentSamples = 0;
+  asked = false;
+  pauseId++;
 
   if (!hadEnoughSpeech) {
     self.postMessage({ status: "vad:speech-cancel" });
@@ -82,10 +95,7 @@ function endTurn() {
   // Drop the trailing silence, except for a short pad.
   const total = frames.length * VAD.frame;
   const keep = Math.min(total, total - silence + toSamples(VAD.postPad));
-  const audio = new Float32Array(total);
-  frames.forEach((frame, index) => audio.set(frame, index * VAD.frame));
-
-  const trimmed = audio.slice(0, keep);
+  const trimmed = joined(frames).slice(0, keep);
   self.postMessage(
     { status: "vad:speech-end", audio: trimmed, silence: (silence / SAMPLE_RATE) * 1000 },
     { transfer: [trimmed.buffer] },
@@ -115,19 +125,33 @@ async function onFrame(frame: Float32Array) {
   if (isSpeech) {
     speechSamples += frame.length;
     silentSamples = 0;
+    // The user carried on, so any question about the last pause is void.
+    asked = false;
+    pauseId++;
   } else {
     silentSamples += frame.length;
   }
 
+  if (turnDetection && !asked && silentSamples >= toSamples(VAD.pause)) {
+    asked = true;
+    if (speechSamples < toSamples(VAD.minSpeech)) {
+      endTurn(); // too short to be speech; drop it now
+      return;
+    }
+    const audio = joined(utterance);
+    self.postMessage({ status: "vad:pause", pause: pauseId, audio }, { transfer: [audio.buffer] });
+  }
+
+  const longestSilence = turnDetection ? VAD.maxSilence : VAD.minSilence;
   const tooLong = utterance.length * VAD.frame >= toSamples(VAD.maxSpeech);
-  if (silentSamples >= toSamples(VAD.minSilence) || tooLong) endTurn();
+  if (silentSamples >= toSamples(longestSilence) || tooLong) endTurn();
 }
 
 // Frames must be processed one at a time and in order.
 let queue: Promise<unknown> = Promise.resolve();
 
 self.addEventListener("message", (event) => {
-  const { type, data } = event.data;
+  const { type, data, pause } = event.data;
 
   queue = queue
     .then(async () => {
@@ -141,6 +165,13 @@ self.addEventListener("message", (event) => {
           break;
         case "vad:reset":
           reset();
+          break;
+        case "vad:turn-detection":
+          turnDetection = data;
+          break;
+        case "vad:end-turn":
+          // Turn detection says the user has finished, if they haven't spoken since.
+          if (speaking && pause === pauseId) endTurn();
           break;
       }
     })

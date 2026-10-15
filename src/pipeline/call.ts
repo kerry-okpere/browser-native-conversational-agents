@@ -7,6 +7,8 @@ import type {
   ReplyMessage,
   Stt,
   Tts,
+  Turn,
+  TurnCheck,
   Vad,
 } from "./index.type";
 import { ORB_BANDS } from "../constants";
@@ -16,10 +18,14 @@ import { timestamp } from "../helpers";
 // tail of its own voice isn't heard as the user.
 const RESUME_DELAY = 250;
 
+// A sentence is finished once its closing punctuation is followed by a space.
+// Waiting for the space avoids cutting "3.5" in half mid-stream.
+const SENTENCE = /^[\s\S]*?[.!?]+(?=\s)/;
+
 // Whisper marks non-speech with tags like "[BLANK_AUDIO]" or "(wind blowing)".
 const NOT_SPEECH = /^[[(].*[\])]$/;
 
-type Stages = { vad: Vad; stt: Stt; llm: Llm; tts: Tts };
+type Stages = { vad: Vad; turn: Turn; stt: Stt; llm: Llm; tts: Tts };
 type Handlers = { [K in keyof CallEvents]: ((detail: CallEvents[K]) => void)[] };
 
 export class VoiceCall implements Call {
@@ -29,6 +35,8 @@ export class VoiceCall implements Call {
   // Bumped whenever a new turn starts or the call ends, so that work still in
   // flight for an older turn can tell it has been overtaken.
   private turn = 0;
+  // The latest answer from turn detection, shown with the message it ended.
+  private turnCheck?: TurnCheck;
   private stages: Stages;
 
   constructor(stages: Stages) {
@@ -45,7 +53,7 @@ export class VoiceCall implements Call {
 
   async start() {
     if (this.current !== "idle") return;
-    const { vad, llm } = this.stages;
+    const { vad, turn, llm } = this.stages;
 
     this.setState("starting");
     try {
@@ -57,6 +65,10 @@ export class VoiceCall implements Call {
           if (this.current === "hearing") this.setState("listening");
         },
         onSpeechEnd: (audio, silence) => this.onSpeech(audio, silence),
+        isTurnComplete: async (audio) => {
+          this.turnCheck = await turn.check(audio);
+          return this.turnCheck.complete;
+        },
       });
     } catch (error) {
       this.setState("idle");
@@ -91,13 +103,18 @@ export class VoiceCall implements Call {
   }
 
   async close() {
-    const { vad, stt, llm, tts } = this.stages;
+    const { vad, turn, stt, llm, tts } = this.stages;
     this.end();
 
     const before = (await navigator.storage.estimate()).usage ?? 0;
     // Chrome owns the LLM's model, so a page can only unload it, not delete it.
     llm.destroy();
-    await Promise.all([vad.deleteDownloads(), stt.deleteDownloads(), tts.deleteDownloads()]);
+    await Promise.all([
+      vad.deleteDownloads(),
+      turn.deleteDownloads(),
+      stt.deleteDownloads(),
+      tts.deleteDownloads(),
+    ]);
     const after = (await navigator.storage.estimate()).usage ?? 0;
 
     this.emit("closed", { recovered: Math.max(0, before - after) });
@@ -117,6 +134,9 @@ export class VoiceCall implements Call {
 
     const turn = ++this.turn;
     const origin = performance.now() - silence;
+    // Only a "finished" answer ended the turn; otherwise it was the long silence.
+    const turnCheck = this.turnCheck?.complete ? this.turnCheck : undefined;
+    this.turnCheck = undefined;
     this.setState("thinking");
 
     try {
@@ -135,6 +155,7 @@ export class VoiceCall implements Call {
         from: "speech",
         finalSegment: performance.now() - origin,
         vadWait: silence,
+        turn: turnCheck,
       });
       await this.respond(text, origin, "speech", turn);
     } catch (error) {
@@ -162,6 +183,25 @@ export class VoiceCall implements Call {
     vad.pause(); // the agent doesn't listen while it is thinking or talking
     this.setState("thinking");
 
+    // Each sentence is spoken as soon as it is complete, while the rest of
+    // the reply is still being written.
+    let unspoken = "";
+    const spoken: Promise<void>[] = [];
+    const speak = (sentence: string) => {
+      const done = tts
+        .speak(sentence, () => {
+          if (!isCurrent()) return;
+          if (reply.firstAudio === undefined) {
+            reply.firstAudio = since();
+            update();
+          }
+          this.setState("speaking");
+        })
+        // A speech failure shouldn't lose the written reply.
+        .catch((error) => console.error("[tts]", error));
+      spoken.push(done);
+    };
+
     try {
       const full = await llm.reply(text, (chunk) => {
         if (!isCurrent()) return;
@@ -171,6 +211,13 @@ export class VoiceCall implements Call {
         }
         reply.text += chunk;
         update();
+
+        unspoken += chunk;
+        let sentence: RegExpMatchArray | null;
+        while ((sentence = unspoken.match(SENTENCE))) {
+          speak(sentence[0]);
+          unspoken = unspoken.slice(sentence[0].length);
+        }
       });
       if (!isCurrent()) return;
 
@@ -178,12 +225,8 @@ export class VoiceCall implements Call {
       reply.lastText = since();
       update();
 
-      this.setState("speaking");
-      await tts.speak(reply.text, () => {
-        if (!isCurrent()) return;
-        reply.firstAudio = since();
-        update();
-      });
+      speak(unspoken); // whatever is left once the reply ends
+      await Promise.all(spoken);
     } catch (error) {
       if (!isCurrent()) return;
       reply.error = (error as Error).message;

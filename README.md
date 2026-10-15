@@ -41,6 +41,15 @@ src/
 
 As STT and LLM stages are added, they'll follow the same pattern: a dedicated worker, loaded on demand, communicating with the main thread via `postMessage`.
 
+## Before you start
+
+> [!IMPORTANT]
+> **Turn on WebGPU in your browser.** The speech models run on your GPU through WebGPU. Check its status by opening **`chrome://gpu/`** and looking for **WebGPU: Hardware accelerated**.
+>
+> **Check Chrome's built-in AI model.** The LLM is Chrome's own on-device model. Open **`chrome://on-device-internals/`** to see whether it is downloaded and ready. Chrome needs about 22 GB of free disk space before it will download it.
+
+Copy these addresses into the address bar; Chrome doesn't open `chrome://` pages from links.
+
 ## Getting started
 
 ```bash

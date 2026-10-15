@@ -22,6 +22,10 @@ None of these give real voice cloning out of the box — see Voice Cloning below
 - [ ] **Tool calling** — let the LLM call tools/functions (the Prompt API has none built in; use structured output).
 - [ ] **Agent ends the call** — expose "end call" as a tool so the agent can end the session itself. Depends on tool calling.
 
+## In-browser RAG
+
+- [ ] Add retrieval-augmented generation that runs entirely in the browser, so the agent can answer from our own documents. Use [voy-search](https://www.npmjs.com/package/voy-search) as the vector index, with embeddings computed in the browser (e.g. a Transformers.js embedding model).
+
 ## Voice cloning
 
 - [ ] Investigate few-shot/zero-shot voice cloning options that can run in-browser (or acceptably via a hybrid approach), as an alternative/addition to the fixed-voice engines above.
