@@ -46,3 +46,12 @@ None of these give real voice cloning out of the box — see Voice Cloning below
 
 - [ ] Define a shared interface/contract per stage (`STTEngine`, `TTSEngine`, `LLMEngine`, `VADEngine`) so engines are swappable without changing the pipeline glue — mirrors how [Pipecat](https://github.com/pipecat-ai/pipecat) composes STT/LLM/TTS/VAD services behind common interfaces.
 - [ ] Each engine should still own its Worker internally (as `tts.ts` does today), so the pipeline class is orchestration only, not where inference happens.
+
+
+Backchanneling or proactive interruption
+
+- Implement imgae reasoning 
+- improve the agent prompt to optimize it for gdg abuja
+- Implement barge in 
+- tool calling 
+- RAG Implement https://www.npmjs.com/package/voy-search and embedded gemma 

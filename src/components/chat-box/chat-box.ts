@@ -40,7 +40,7 @@ export class ChatBox extends HTMLElement {
     root.innerHTML = `<style>${shared}${css}</style>${html}`;
 
     const form = root.querySelector('form')!;
-    const input = root.querySelector('input')!;
+    const input = root.querySelector<HTMLInputElement>('input[type=text]')!;
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -56,8 +56,37 @@ export class ChatBox extends HTMLElement {
 
     const root = this.shadowRoot!;
     const messages = root.querySelector('.messages')!;
-    const input = root.querySelector('input')!;
+    const input = root.querySelector<HTMLInputElement>('input[type=text]')!;
     const send = root.querySelector('button')!;
+    const attach = root.querySelector<HTMLLabelElement>('.attach')!;
+    const picker = root.querySelector<HTMLInputElement>('input[type=file]')!;
+
+    // The image waits on the button as a thumbnail until it goes out with the
+    // next message; clicking the thumbnail removes it.
+    const thumbnail = (image: Blob) => {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(image);
+      img.alt = '';
+      return img;
+    };
+    const showAttached = (image: Blob | null) => {
+      attach.classList.toggle('chosen', Boolean(image));
+      attach.querySelector('span')!.replaceChildren(image ? thumbnail(image) : 'Image');
+      attach.title = image ? 'Remove the image' : 'Show the agent an image';
+    };
+
+    picker.addEventListener('change', () => {
+      const image = picker.files?.[0] ?? null;
+      picker.value = ''; // so choosing the same file again still fires
+      call.attach(image);
+      showAttached(image);
+    });
+    attach.addEventListener('click', (event) => {
+      if (!attach.classList.contains('chosen')) return; // opens the file picker
+      event.preventDefault();
+      call.attach(null);
+      showAttached(null);
+    });
 
     // Adds a bubble with a small line under it for the timestamp and timings.
     const addMessage = (role: 'user' | 'assistant') => {
@@ -82,6 +111,10 @@ export class ChatBox extends HTMLElement {
     call.on('user', (user) => {
       const { message, meta } = addMessage('user');
       message.textContent = user.text;
+      if (user.image) {
+        message.prepend(thumbnail(user.image));
+        showAttached(null); // it has been sent
+      }
       meta.textContent = describeUser(user);
       scrollToBottom();
     });

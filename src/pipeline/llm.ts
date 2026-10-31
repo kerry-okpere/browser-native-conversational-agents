@@ -12,7 +12,7 @@ Never use lists, markdown, emojis, or headings, because your reply is read aloud
 If you need more detail to help, ask one short question.`;
 
 const OPTIONS: CreateOptions = {
-  expectedInputs: [{ type: "text", languages: ["en"] }],
+  expectedInputs: [{ type: "text", languages: ["en"] }, { type: "image" }],
   expectedOutputs: [{ type: "text", languages: ["en"] }],
 };
 
@@ -83,8 +83,11 @@ export function createLlm(): Llm {
       onDownloadProgress = onProgress;
       await getSession();
     },
-    async reply(text, onChunk) {
-      const reader = (await getSession()).promptStreaming(text).getReader();
+    async reply(text, onChunk, image) {
+      const input = image
+        ? [{ role: "user" as const, content: [{ type: "text" as const, value: text }, { type: "image" as const, value: image }] }]
+        : text;
+      const reader = (await getSession()).promptStreaming(input).getReader();
 
       let full = "";
       while (true) {

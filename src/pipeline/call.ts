@@ -23,6 +23,9 @@ const RESUME_DELAY = 250;
 const SENTENCE = /^[\s\S]*?[.!?]+(?=\s)/;
 
 // Whisper marks non-speech with tags like "[BLANK_AUDIO]" or "(wind blowing)".
+// What to ask when an image is sent with no words.
+const DESCRIBE_IMAGE = "What do you see in this picture?";
+
 const NOT_SPEECH = /^[[(].*[\])]$/;
 
 type Stages = { vad: Vad; turn: Turn; stt: Stt; llm: Llm; tts: Tts };
@@ -38,6 +41,8 @@ export class VoiceCall implements Call {
   // The latest answer from turn detection, shown with the message it ended.
   private turnCheck?: TurnCheck;
   private stages: Stages;
+  // An image waiting to go out with the next message.
+  private image?: Blob;
 
   constructor(stages: Stages) {
     this.stages = stages;
@@ -79,16 +84,27 @@ export class VoiceCall implements Call {
     this.setState("listening");
   }
 
+  attach(image: Blob | null) {
+    this.image = image ?? undefined;
+  }
+
   async send(text: string) {
-    const message = text.trim();
+    const message = text.trim() || (this.image ? DESCRIBE_IMAGE : "");
     if (!message || this.current === "idle" || this.current === "starting") return;
 
     this.stages.tts.stop(); // typing interrupts the agent
     const turn = ++this.turn;
     const origin = performance.now();
+    const image = this.takeImage();
 
-    this.emit("user", { id: this.nextId++, text: message, at: timestamp(), from: "text" });
-    await this.respond(message, origin, "text", turn);
+    this.emit("user", { id: this.nextId++, text: message, at: timestamp(), from: "text", image });
+    await this.respond(message, origin, "text", turn, image);
+  }
+
+  private takeImage() {
+    const image = this.image;
+    this.image = undefined;
+    return image;
   }
 
   end() {
@@ -148,6 +164,7 @@ export class VoiceCall implements Call {
         return;
       }
 
+      const image = this.takeImage();
       this.emit("user", {
         id: this.nextId++,
         text,
@@ -156,8 +173,9 @@ export class VoiceCall implements Call {
         finalSegment: performance.now() - origin,
         vadWait: silence,
         turn: turnCheck,
+        image,
       });
-      await this.respond(text, origin, "speech", turn);
+      await this.respond(text, origin, "speech", turn, image);
     } catch (error) {
       if (turn !== this.turn) return;
       this.emit("reply", {
@@ -172,7 +190,7 @@ export class VoiceCall implements Call {
 
   // Gets the reply and speaks it. Every duration is measured from `origin`,
   // the end of the user's turn.
-  private async respond(text: string, origin: number, from: "speech" | "text", turn: number) {
+  private async respond(text: string, origin: number, from: "speech" | "text", turn: number, image?: Blob) {
     const { vad, llm, tts } = this.stages;
     const since = () => performance.now() - origin;
     const isCurrent = () => turn === this.turn;
@@ -218,7 +236,7 @@ export class VoiceCall implements Call {
           speak(sentence[0]);
           unspoken = unspoken.slice(sentence[0].length);
         }
-      });
+      }, image);
       if (!isCurrent()) return;
 
       reply.text = full.trim(); // the model sometimes ends with blank lines

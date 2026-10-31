@@ -1,14 +1,20 @@
 export type Availability = "unavailable" | "downloadable" | "downloading" | "available";
+/** A user message that mixes text with an image. */
+export type PromptMessage = {
+  role: "user";
+  content: ({ type: "text"; value: string } | { type: "image"; value: Blob })[];
+};
+
 export type Session = {
   prompt(input: string): Promise<string>;
-  promptStreaming(input: string): ReadableStream<string>;
+  promptStreaming(input: string | PromptMessage[]): ReadableStream<string>;
   clone(): Promise<Session>;
   destroy(): void;
 };
 
 export type CreateOptions = {
   initialPrompts?: { role: "system" | "user" | "assistant"; content: string }[];
-  expectedInputs?: { type: "text"; languages: string[] }[];
+  expectedInputs?: ({ type: "text"; languages: string[] } | { type: "image" })[];
   expectedOutputs?: { type: "text"; languages: string[] }[];
   monitor?: (monitor: EventTarget) => void;
 };
@@ -46,8 +52,11 @@ export type Llm = Stage & {
    * "available", call `load` from a click or submit handler.
    */
   availability: () => Promise<Availability>;
-  /** Send a message; `onChunk` receives the reply piece by piece as it is generated. */
-  reply: (text: string, onChunk: (chunk: string) => void) => Promise<string>;
+  /**
+   * Send a message, optionally with an image for the model to look at.
+   * `onChunk` receives the reply piece by piece as it is generated.
+   */
+  reply: (text: string, onChunk: (chunk: string) => void, image?: Blob) => Promise<string>;
 };
 
 export type Tts = Stage & {
@@ -153,6 +162,8 @@ export type UserMessage = {
   vadWait?: number;
   /** The turn-detection result that ended the turn, if it was the one that ended it. */
   turn?: TurnCheck;
+  /** An image sent along with the message. */
+  image?: Blob;
 };
 
 /** The agent's reply. It is sent again each time it changes, with the same id. */
@@ -182,6 +193,8 @@ export type Call = {
   start: () => Promise<void>;
   /** Send a typed message. It interrupts the agent if it is speaking. */
   send: (text: string) => Promise<void>;
+  /** Show the agent an image along with the next message, typed or spoken. `null` removes it. */
+  attach: (image: Blob | null) => void;
   /** Stop listening and speaking, and forget the conversation. */
   end: () => void;
   /** End the call, unload every model and delete the downloaded files. */
