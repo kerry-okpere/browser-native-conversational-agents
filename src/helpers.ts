@@ -6,6 +6,9 @@ export const toMB = (bytes = 0) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 export const timestamp = () => new Date().toLocaleTimeString([], { hour12: false });
 
+/** Drop markdown emphasis (`*you*`, `_you_`, backticks) the model writes despite being told not to. */
+export const stripMarkup = (text: string) => text.replace(/[*_`]/g, "");
+
 /** Decode a recording into the mono samples the speech-to-text model expects. */
 export async function toSamples(recording: Blob): Promise<Float32Array> {
   const context = new AudioContext({ sampleRate: SAMPLE_RATE });

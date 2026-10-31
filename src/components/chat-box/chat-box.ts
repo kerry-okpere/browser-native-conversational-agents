@@ -113,6 +113,7 @@ export class ChatBox extends HTMLElement {
       message.textContent = user.text;
       if (user.image) {
         message.prepend(thumbnail(user.image));
+        message.classList.toggle('image-only', !user.text);
         showAttached(null); // it has been sent
       }
       meta.textContent = describeUser(user);

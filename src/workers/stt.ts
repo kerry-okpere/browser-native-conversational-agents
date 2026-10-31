@@ -6,7 +6,11 @@ import {
 import { SAMPLE_RATE } from "../constants";
 
 const MODEL_ID = "Xenova/whisper-tiny";
+// Keyword boost: Whisper treats this as the text spoken just before the audio, so it
+// spells these names the same way. A natural sentence works better than a bare list.
+const KEYWORDS = "Welcome to DevFest Abuja, hosted by GDG Abuja. Kerry is giving a talk on WebAI and browser AI, with Gemini nano and WebGPU.";
 let transcriber: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
+let prompt: number[] = [];
 
 function handleProgress(info: ProgressInfo): void {
   if (info.status === "progress_total") {
@@ -27,18 +31,32 @@ function load() {
       dtype: { encoder_model: gpu ? "fp32" : "q8", decoder_model_merged: "q8" },
       progress_callback: handleProgress,
     });
+    const tokenizer = asr.tokenizer;
+    prompt = [
+      tokenizer.convert_tokens_to_ids("<|startofprev|>"),
+      ...tokenizer.encode(` ${KEYWORDS}`, { add_special_tokens: false }),
+      ...tokenizer.convert_tokens_to_ids(["<|startoftranscript|>", "<|en|>", "<|transcribe|>", "<|notimestamps|>"]),
+    ];
+
     // Warm up on one second of silence so the first real request isn't slow.
-    await asr(new Float32Array(SAMPLE_RATE));
+    await transcribe(asr, new Float32Array(SAMPLE_RATE));
     return asr;
   })();
   return transcriber;
 }
 
+// Calls the model directly because the pipeline has no option for a Whisper prompt.
+async function transcribe(asr: AutomaticSpeechRecognitionPipeline, audio: Float32Array) {
+  const { input_features } = await asr.processor(audio);
+  const output = await asr.model.generate({ inputs: input_features, decoder_input_ids: prompt });
+  // The output starts with the prompt; decode only what came after it.
+  const ids = (output as any).tolist()[0].slice(prompt.length);
+  return asr.tokenizer.decode(ids, { skip_special_tokens: true }).trim();
+}
+
 async function generate(id: number, audio: Float32Array) {
-  const asr = await load();
-  const result = await asr(audio);
-  const text = Array.isArray(result) ? result[0].text : result.text;
-  self.postMessage({ status: "stt:complete", id, text: text.trim() });
+  const text = await transcribe(await load(), audio);
+  self.postMessage({ status: "stt:complete", id, text });
 }
 
 self.addEventListener("message", async (event) => {

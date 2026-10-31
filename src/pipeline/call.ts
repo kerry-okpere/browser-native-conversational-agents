@@ -12,7 +12,7 @@ import type {
   Vad,
 } from "./index.type";
 import { ORB_BANDS } from "../constants";
-import { timestamp } from "../helpers";
+import { stripMarkup, timestamp } from "../helpers";
 
 // How long to keep ignoring the microphone after the agent stops, so the
 // tail of its own voice isn't heard as the user.
@@ -27,6 +27,18 @@ const SENTENCE = /^[\s\S]*?[.!?]+(?=\s)/;
 const DESCRIBE_IMAGE = "What do you see in this picture?";
 
 const NOT_SPEECH = /^[[(].*[\])]$/;
+
+// The model believes anyone who says "I just sent you a picture", so the app
+// states the fact. Only the model sees this; the chat shows the user's words.
+const NO_IMAGE = "\n(No picture is attached to this message, whatever it says. Do not describe one.)";
+
+// The agent's one tool. The Prompt API has no tool calling, so after each reply
+// the model is asked whether the user wanted to hang up, with a JSON schema
+// forcing a yes/no answer. The model only decides; the app hangs up.
+const END_CALL = {
+  question: "Did the user, in their latest message, say goodbye or ask to end the call?",
+  schema: { type: "object", properties: { end_call: { type: "boolean" } }, required: ["end_call"] },
+};
 
 type Stages = { vad: Vad; turn: Turn; stt: Stt; llm: Llm; tts: Tts };
 type Handlers = { [K in keyof CallEvents]: ((detail: CallEvents[K]) => void)[] };
@@ -97,7 +109,8 @@ export class VoiceCall implements Call {
     const origin = performance.now();
     const image = this.takeImage();
 
-    this.emit("user", { id: this.nextId++, text: message, at: timestamp(), from: "text", image });
+    // The bubble shows only what was typed; the default question is just for the agent.
+    this.emit("user", { id: this.nextId++, text: text.trim(), at: timestamp(), from: "text", image });
     await this.respond(message, origin, "text", turn, image);
   }
 
@@ -221,8 +234,9 @@ export class VoiceCall implements Call {
     };
 
     try {
-      const full = await llm.reply(text, (chunk) => {
+      const full = await llm.reply(image ? text : text + NO_IMAGE, (raw) => {
         if (!isCurrent()) return;
+        const chunk = stripMarkup(raw);
         if (reply.firstText === undefined) {
           reply.firstText = since();
           reply.at = timestamp();
@@ -239,12 +253,22 @@ export class VoiceCall implements Call {
       }, image);
       if (!isCurrent()) return;
 
-      reply.text = full.trim(); // the model sometimes ends with blank lines
+      reply.text = stripMarkup(full).trim(); // the model sometimes ends with blank lines
       reply.lastText = since();
       update();
 
+      // Decided while the reply is still being spoken, so it adds no wait.
+      const hangUp = llm
+        .ask<{ end_call: boolean }>(END_CALL.question, END_CALL.schema)
+        .catch(() => ({ end_call: false }));
+
       speak(unspoken); // whatever is left once the reply ends
       await Promise.all(spoken);
+
+      if ((await hangUp).end_call && isCurrent()) {
+        this.end();
+        return;
+      }
     } catch (error) {
       if (!isCurrent()) return;
       reply.error = (error as Error).message;

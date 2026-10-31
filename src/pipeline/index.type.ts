@@ -5,9 +5,12 @@ export type PromptMessage = {
   content: ({ type: "text"; value: string } | { type: "image"; value: Blob })[];
 };
 
+/** `responseConstraint` is a JSON schema the reply must match (structured output). */
+export type PromptOptions = { responseConstraint?: object };
+
 export type Session = {
-  prompt(input: string): Promise<string>;
-  promptStreaming(input: string | PromptMessage[]): ReadableStream<string>;
+  prompt(input: string, options?: PromptOptions): Promise<string>;
+  promptStreaming(input: string | PromptMessage[], options?: PromptOptions): ReadableStream<string>;
   clone(): Promise<Session>;
   destroy(): void;
 };
@@ -57,6 +60,11 @@ export type Llm = Stage & {
    * `onChunk` receives the reply piece by piece as it is generated.
    */
   reply: (text: string, onChunk: (chunk: string) => void, image?: Blob) => Promise<string>;
+  /**
+   * Ask a question about the conversation so far and get the answer as JSON
+   * matching `schema`. The exchange does not become part of the conversation.
+   */
+  ask: <T>(question: string, schema: object) => Promise<T>;
 };
 
 export type Tts = Stage & {

@@ -20,7 +20,7 @@ None of these give real voice cloning out of the box — see Voice Cloning below
 - [ ] **Interruptions (barge-in)** — the microphone is ignored while the agent is thinking or speaking. Let the user cut in by speaking, which needs reliable echo cancellation first.
 - [x] **Speak while generating** — each sentence goes to TTS as soon as it is complete, in `src/pipeline/call.ts`.
 - [ ] **Tool calling** — let the LLM call tools/functions (the Prompt API has none built in; use structured output).
-- [ ] **Agent ends the call** — expose "end call" as a tool so the agent can end the session itself. Depends on tool calling.
+- [x] **Agent ends the call** — after each reply, `src/pipeline/call.ts` asks the model (structured output, a JSON schema forcing `{ end_call: boolean }`) whether the user said goodbye, and hangs up once the goodbye has been spoken. A marker in the reply text was tried first; the model ignored it.
 
 ## In-browser RAG
 
@@ -50,7 +50,6 @@ None of these give real voice cloning out of the box — see Voice Cloning below
 
 Backchanneling or proactive interruption
 
-- Implement imgae reasoning 
 - improve the agent prompt to optimize it for gdg abuja
 - Implement barge in 
 - tool calling 
