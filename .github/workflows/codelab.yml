@@ -1,13 +1,17 @@
 name: Publish codelab
 
-# Builds codelab/src/*.md with Google's claat tool and deploys the result to
-# GitHub Pages. Edit the Markdown, push, and the live codelab updates.
+# Deploys to GitHub Pages:
+#   /codelab/live/        the run-on-the-page codelab, built with Vite (the landing page opens it)
+#   /browser-voice-agent/ codelab/src/voice-agent-codelab.md, built with Google's claat tool
 
 on:
   push:
     branches: [main, feat/voice-agent-call]
     paths:
-      - "codelab/src/**"
+      - "codelab/**"
+      - "src/**"
+      - "vite.config.ts"
+      - "package-lock.json"
       - ".github/workflows/codelab.yml"
   workflow_dispatch:
 
@@ -42,13 +46,25 @@ jobs:
           # for Markdown sources copy the images next to the exported page.
           cp -r img ../../public/browser-voice-agent/ 2>/dev/null || true
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build the live codelab
+        run: |
+          npm ci
+          # vite build on its own: `npm run build` also runs tsc, which fails on an existing error in src/workers/voice-to-text.ts
+          npx vite build --base=/${{ github.event.repository.name }}/
+          cp -r dist/codelab dist/assets public/
+
       - name: Landing page
         run: |
           cat > public/index.html <<'EOF'
           <!doctype html><meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=browser-voice-agent/">
-          <title>Build a Voice AI Agent in the Browser</title>
-          <a href="browser-voice-agent/">Open the codelab</a>
+          <meta http-equiv="refresh" content="0; url=codelab/live/">
+          <title>Build a Voice Agent in the Browser</title>
+          <a href="codelab/live/">Open the codelab</a>
           EOF
 
       - uses: actions/upload-pages-artifact@v3
