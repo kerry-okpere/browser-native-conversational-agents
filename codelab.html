@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Agent Codelab</title>
+    <style>
+      body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 16px; background: #fff; color: #1f1f1f; }
+      h1 { font-size: 22px; margin: 0 0 16px; }
+      section { border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
+      h2 { font-size: 15px; margin: 0 0 8px; }
+      button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid #888; background: #f4f4f4; cursor: pointer; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      ul { list-style: none; padding: 0; margin: 8px 0 0; }
+      li { display: grid; grid-template-columns: 150px 1fr; gap: 8px; padding: 2px 0; }
+      .ok { color: #137333; } .bad { color: #b3261e; }
+      form { display: flex; gap: 8px; }
+      input { flex: 1; font: inherit; padding: 8px; border: 1px solid #888; border-radius: 6px; }
+      .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+      #status { margin-top: 8px; color: #555; min-height: 1.5em; }
+      #chat p { margin: 6px 0; padding: 6px 10px; border-radius: 6px; }
+      #chat .user { background: #e8f0fe; }
+      #chat .agent { background: #f1f3f4; }
+      #chat .note { color: #666; font-size: 13px; padding: 0 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>Build a voice agent in the browser</h1>
+
+    <section>
+      <h2>Models</h2>
+      <button id="download">Download models</button>
+      <ul id="models"></ul>
+    </section>
+
+    <section>
+      <h2>Talk to the agent</h2>
+      <form id="form"><input id="input" placeholder="Type a message" autocomplete="off" /><button>Send</button></form>
+      <div class="controls">
+        <button id="hold">Hold to talk</button>
+        <button id="call">Start call</button>
+      </div>
+      <div id="status"></div>
+    </section>
+
+    <section id="chat"></section>
+
+    <script type="module" src="/src/codelab/kit.ts"></script>
+  </body>
+</html>

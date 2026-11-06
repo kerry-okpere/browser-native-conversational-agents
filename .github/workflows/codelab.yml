@@ -1,0 +1,66 @@
+name: Publish codelab
+
+# Builds codelab/src/*.md with Google's claat tool and deploys the result to
+# GitHub Pages. Edit the Markdown, push, and the live codelab updates.
+
+on:
+  push:
+    branches: [main, feat/voice-agent-call]
+    paths:
+      - "codelab/src/**"
+      - ".github/workflows/codelab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install claat
+        run: go install github.com/googlecodelabs/tools/claat@latest
+
+      - name: Export codelab
+        run: |
+          mkdir -p public
+          cd codelab/src
+          ~/go/bin/claat export -o ../../public voice-agent-codelab.md
+          # claat copies img/ only when referenced from a Google Doc source;
+          # for Markdown sources copy the images next to the exported page.
+          cp -r img ../../public/browser-voice-agent/ 2>/dev/null || true
+
+      - name: Landing page
+        run: |
+          cat > public/index.html <<'EOF'
+          <!doctype html><meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=browser-voice-agent/">
+          <title>Build a Voice AI Agent in the Browser</title>
+          <a href="browser-voice-agent/">Open the codelab</a>
+          EOF
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

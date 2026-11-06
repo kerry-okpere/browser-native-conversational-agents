@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Build a Voice Agent in the Browser</title>
+    <link rel="stylesheet" href="./live.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Build a voice agent in the browser</h1>
+      <span id="progress"></span>
+    </header>
+
+    <div class="layout">
+      <nav><ol id="steps"></ol></nav>
+
+      <main>
+        <!-- Each <section class="step"> is one page. A <script type="text/plain" class="code"> inside it
+             becomes that step's code box. "+ " marks a line the attendee turns on (it starts commented out),
+             "- " a line they turn off (it starts on). -->
+
+        <section class="step" data-title="Overview">
+          <h2>What you'll build</h2>
+          <p>A voice agent you can talk to, running entirely in Chrome. There's no server and no API key: the language model, speech-to-text, text-to-speech and voice detection all run on your laptop.</p>
+          <p>You build it in six layers. Each step adds a few lines to the agent's code, right here on this page. You press <b>Run</b> and talk to the result.</p>
+          <table>
+            <tr><th>Step</th><th>What it adds</th><th>Model</th></tr>
+            <tr><td>1</td><td>Ask a question, get an answer</td><td>Gemini Nano</td></tr>
+            <tr><td>2</td><td>The agent reads its answer aloud</td><td>Kokoro</td></tr>
+            <tr><td>3</td><td>You speak instead of typing</td><td>Whisper</td></tr>
+            <tr><td>4</td><td>It starts talking before it has finished thinking</td><td></td></tr>
+            <tr><td>5</td><td>Hands-free: it hears when you start and stop</td><td>Silero VAD</td></tr>
+            <tr><td>6</td><td>It waits until you've finished your thought</td><td>Smart Turn</td></tr>
+          </table>
+          <h3>You need</h3>
+          <ul>
+            <li>Desktop Chrome 148 or later, on a laptop with at least 22 GB of free disk space</li>
+            <li>A microphone, and headphones help</li>
+          </ul>
+        </section>
+
+        <section class="step" data-title="Set up Chrome">
+          <h2>Set up Chrome</h2>
+          <p>Gemini Nano is a language model built into Chrome. From Chrome 148 any web page can use it, so you don't need to change any settings or flags.</p>
+          <ol>
+            <li>Open <code>chrome://settings/help</code>. If Chrome offers an update, install it and relaunch. The version must be 148 or higher.</li>
+            <li>Come back to this page and look at <b>Gemini Nano</b> in the box below.</li>
+          </ol>
+          <div class="models-slot"></div>
+          <table>
+            <tr><th>If Gemini Nano says</th><th>Do this</th></tr>
+            <tr><td>Not downloaded yet</td><td>All good. You download it in the next step.</td></tr>
+            <tr><td>Ready</td><td>All good, it's already on this laptop.</td></tr>
+            <tr><td>Not in this browser</td><td>Your Chrome is older than 148, or isn't desktop Chrome. Update it and relaunch.</td></tr>
+            <tr><td>This device can't run it</td><td>The laptop doesn't have enough disk space, memory or graphics power. Pair up with someone whose laptop works.</td></tr>
+          </table>
+          <aside>The speech models use WebGPU, which runs them on the graphics chip. It's on by default in Chrome. Without it they still work, just slower.</aside>
+        </section>
+
+        <section class="step" data-title="Download the models">
+          <h2>Download the models</h2>
+          <p>Press <b>Download models</b> and keep this tab open until every row says <b>Ready</b>. Gemini Nano is about 4 GB, so it can take a few minutes. The others are small.</p>
+          <div class="models-slot"></div>
+          <p>The models stay on your laptop afterwards, so next time they load in a few seconds.</p>
+        </section>
+
+        <section class="step" data-title="1. Ask Gemini Nano">
+          <h2>Step 1: Ask Gemini Nano</h2>
+          <p><code>LanguageModel.create()</code> opens a session on Gemini Nano. The system prompt asks for short, spoken-style replies, because later the agent reads them aloud.</p>
+          <p><code>onText()</code> runs when you press Send. The two lines that ask the model and show the answer are turned off.</p>
+          <ol>
+            <li>Select the two lines marked <code>STEP 1</code> and press <kbd>⌘</kbd> <kbd>/</kbd> (Mac) or <kbd>Ctrl</kbd> <kbd>/</kbd> (Windows) to turn them on.</li>
+            <li>Press <b>Run</b>, then type a question and press <b>Send</b>.</li>
+          </ol>
+          <script type="text/plain" class="code">
+const SYSTEM_PROMPT = `You are a friendly voice assistant.
+Reply the way a person talks: one or two short sentences.
+Never use lists, markdown or emojis, because your reply is read aloud.`;
+
+let session;
+async function getSession() {
+  session ??= await LanguageModel.create({
+    initialPrompts: [{ role: "system", content: SYSTEM_PROMPT }],
+    expectedOutputs: [{ type: "text", languages: ["en"] }],
+  });
+  return session;
+}
+
+// Runs when you press Send.
+async function onText(text) {
+  chat.user(text);
+
+  // STEP 1 · one question, one answer
++ const answer = await (await getSession()).prompt(text);
++ chat.agent(answer);
+}
+          </script>
+        </section>
+
+        <section class="step" data-title="2. Hear the answer">
+          <h2>Step 2: Hear the answer</h2>
+          <p><code>tts</code> is Kokoro, a small text-to-speech model. <code>tts.speak()</code> turns text into speech and plays it.</p>
+          <ol>
+            <li>Turn on the <code>STEP 2</code> line.</li>
+            <li>Press <b>Run</b> and send a message. The agent reads its answer aloud.</li>
+          </ol>
+          <script type="text/plain" class="code">
+const SYSTEM_PROMPT = `You are a friendly voice assistant.
+Reply the way a person talks: one or two short sentences.
+Never use lists, markdown or emojis, because your reply is read aloud.`;
+
+let session;
+async function getSession() {
+  session ??= await LanguageModel.create({
+    initialPrompts: [{ role: "system", content: SYSTEM_PROMPT }],
+    expectedOutputs: [{ type: "text", languages: ["en"] }],
+  });
+  return session;
+}
+
+// Runs when you press Send.
+async function onText(text) {
+  chat.user(text);
+  const answer = await (await getSession()).prompt(text);
+  chat.agent(answer);
+
+  // STEP 2 · hear the answer
++ await tts.speak(answer);
+}
+          </script>
+        </section>
+
+        <section class="step" data-title="3. Speak instead of typing">
+          <h2>Step 3: Speak instead of typing</h2>
+          <p>While you hold <b>Hold to talk</b>, the page records the microphone. When you let go, it passes the audio to <code>onVoice()</code>.</p>
+          <p><code>transcribe()</code> uses Whisper, a speech-to-text model, to turn the audio into text. The text then goes through <code>onText()</code>, the same path as typing.</p>
+          <ol>
+            <li>Turn on the two <code>STEP 3</code> lines.</li>
+            <li>Press <b>Run</b>. Hold <b>Hold to talk</b>, ask a question, and let go. Chrome asks to use the microphone the first time.</li>
+          </ol>
+          <script type="text/plain" class="code">
+const SYSTEM_PROMPT = `You are a friendly voice assistant.
+Reply the way a person talks: one or two short sentences.
+Never use lists, markdown or emojis, because your reply is read aloud.`;
+
+let session;
+async function getSession() {
+  session ??= await LanguageModel.create({
+    initialPrompts: [{ role: "system", content: SYSTEM_PROMPT }],
+    expectedOutputs: [{ type: "text", languages: ["en"] }],
+  });
+  return session;
+}
+
+// Runs when you press Send.
+async function onText(text) {
+  chat.user(text);
+  const answer = await (await getSession()).prompt(text);
+  chat.agent(answer);
+  await tts.speak(answer);
+}
+
+// Runs when you let go of Hold to talk.
+async function onVoice(audio) {
+  // STEP 3 · audio in, text out, then the same path as typing
++ const text = await transcribe(audio);
++ if (text) await onText(text);
+}
+          </script>
+        </section>
+
+        <section class="step" data-title="4. Real time">
+          <h2>Step 4: Real time</h2>
+          <p>Until now the agent waits for Gemini Nano to write the whole answer, then speaks. That's a long silence.</p>
+          <p><code>promptStreaming()</code> hands over the answer a few words at a time. As soon as a whole sentence has arrived, it goes to Kokoro. So the agent starts talking while the model is still writing the rest.</p>
+          <ol>
+            <li>Turn on the <code>STEP 4</code> line in <code>onText()</code>. It replaces the three lines above it, which are now off.</li>
+            <li>Press <b>Run</b> and ask for something long, like a short story. Notice how quickly it starts speaking.</li>
+          </ol>
+          <script type="text/plain" class="code">
+const SYSTEM_PROMPT = `You are a friendly voice assistant.
+Reply the way a person talks: one or two short sentences.
+Never use lists, markdown or emojis, because your reply is read aloud.`;
+
+let session;
+async function getSession() {
+  session ??= await LanguageModel.create({
+    initialPrompts: [{ role: "system", content: SYSTEM_PROMPT }],
+    expectedOutputs: [{ type: "text", languages: ["en"] }],
+  });
+  return session;
+}
+
+// Runs when you press Send.
+async function onText(text) {
+  chat.user(text);
+  // const answer = await (await getSession()).prompt(text);
+  // chat.agent(answer);
+  // await tts.speak(answer);
+
+  // STEP 4 · real time
++ await replyInRealTime(text);
+}
+
+// Runs when you let go of Hold to talk.
+async function onVoice(audio) {
+  const text = await transcribe(audio);
+  if (text) await onText(text);
+}
+
+// A sentence is finished once its . ! or ? is followed by a space ("3.5" is not cut in half).
+const SENTENCE = /^[\s\S]*?[.!?]+(?=\s)/;
+
+async function replyInRealTime(text) {
+  const bubble = chat.agent("");
+  const spoken = [];
+  let unspoken = "";
+
+  const stream = (await getSession()).promptStreaming(text);
+  for await (const chunk of stream) {
+    bubble.append(chunk);
+    unspoken += chunk;
+
+    let sentence;
+    while ((sentence = unspoken.match(SENTENCE))) {
+      spoken.push(tts.speak(sentence[0])); // speak() queues, so sentences play in order
+      unspoken = unspoken.slice(sentence[0].length);
+    }
+  }
+  spoken.push(tts.speak(unspoken)); // whatever is left at the end
+  await Promise.all(spoken);
+}
+          </script>
+        </section>
+
+        <section class="step" data-title="5. Hands-free">
+          <h2>Step 5: Hands-free with voice activity detection</h2>
+          <p>No more button. <code>vad</code> is Silero VAD, a voice activity detection model. It listens to the microphone, checks every 32 ms whether someone is speaking, and calls you back when you start and when you stop.</p>
+          <p><code>startCall()</code> runs when you press <b>Start call</b>. When you stop talking, your audio goes to <code>onVoice()</code>, the same as letting go of the button.</p>
+          <p>The agent would hear itself through your speakers and answer itself. The two <code>vad.pause()</code> and <code>vad.resume()</code> lines stop it listening while it talks.</p>
+          <ol>
+            <li>Turn on all the <code>STEP 5</code> lines. Select them together and press <kbd>⌘</kbd> <kbd>/</kbd> once.</li>
+            <li>Press <b>Run</b>, then <b>Start call</b>, and just talk.</li>
+          </ol>
+          <script type="text/plain" class="code">
+const SYSTEM_PROMPT = `You are a friendly voice assistant.
+Reply the way a person talks: one or two short sentences.
+Never use lists, markdown or emojis, because your reply is read aloud.`;
+
+let session;
+async function getSession() {
+  session ??= await LanguageModel.create({
+    initialPrompts: [{ role: "system", content: SYSTEM_PROMPT }],
+    expectedOutputs: [{ type: "text", languages: ["en"] }],
+  });
+  return session;
+}
+
+// Runs when you press Send.
+async function onText(text) {
+  chat.user(text);
+  await replyInRealTime(text);
+}
+
+// Runs when you let go of Hold to talk, and when the VAD hears you stop.
+async function onVoice(audio) {
+  const text = await transcribe(audio);
+  if (text) await onText(text);
+}
+
+const SENTENCE = /^[\s\S]*?[.!?]+(?=\s)/;
+
+async function replyInRealTime(text) {
+  const bubble = chat.agent("");
+  const spoken = [];
+  let unspoken = "";
+
++ vad.pause(); // STEP 5 · don't listen while the agent talks
+
+  const stream = (await getSession()).promptStreaming(text);
+  for await (const chunk of stream) {
+    bubble.append(chunk);
+    unspoken += chunk;
+    let sentence;
+    while ((sentence = unspoken.match(SENTENCE))) {
+      spoken.push(tts.speak(sentence[0]));
+      unspoken = unspoken.slice(sentence[0].length);
+    }
+  }
+  spoken.push(tts.speak(unspoken));
+  await Promise.all(spoken);
+
++ vad.resume(); // STEP 5 · listen again
+}
+
+// Runs when you press Start call.
+async function startCall() {
+  // STEP 5 · open the microphone and react when you start and stop talking
++ await vad.listen({
++   onSpeechStart: () => chat.status("Hearing you…"),
++   onSpeechEnd: (audio) => {
++     chat.status("Thinking…");
++     onVoice(audio).finally(() => chat.status("Listening"));
++   },
++   onSpeechCancel: () => chat.status("Listening"), // a cough or a click, not speech
++ });
++ chat.status("Listening");
+}
+          </script>
+        </section>
+
+        <section class="step" data-title="6. Turn detection">
+          <h2>Step 6: Turn detection</h2>
+          <p>The VAD treats any short pause as the end of what you're saying. Pause to think in the middle of a sentence and the agent jumps in.</p>
+          <p><code>turn</code> is Smart Turn, a model that listens to how your voice ends: falling tone, a finished phrase, or a trailing "um". At each short pause the VAD asks it "has the user finished?" and only ends your turn when the answer is yes. The chat shows how sure it was.</p>
+          <ol>
+            <li>Turn on the <code>STEP 6</code> lines.</li>
+            <li>Press <b>Run</b>, then <b>Start call</b>. Say "I'd like to know… um…" and pause, then finish the question.</li>
+          </ol>
+          <script type="text/plain" class="code">
+const SYSTEM_PROMPT = `You are a friendly voice assistant.
+Reply the way a person talks: one or two short sentences.
+Never use lists, markdown or emojis, because your reply is read aloud.`;
+
+let session;
+async function getSession() {
+  session ??= await LanguageModel.create({
+    initialPrompts: [{ role: "system", content: SYSTEM_PROMPT }],
+    expectedOutputs: [{ type: "text", languages: ["en"] }],
+  });
+  return session;
+}
+
+async function onText(text) {
+  chat.user(text);
+  await replyInRealTime(text);
+}
+
+async function onVoice(audio) {
+  const text = await transcribe(audio);
+  if (text) await onText(text);
+}
+
+const SENTENCE = /^[\s\S]*?[.!?]+(?=\s)/;
+
+async function replyInRealTime(text) {
+  const bubble = chat.agent("");
+  const spoken = [];
+  let unspoken = "";
+
+  vad.pause();
+
+  const stream = (await getSession()).promptStreaming(text);
+  for await (const chunk of stream) {
+    bubble.append(chunk);
+    unspoken += chunk;
+    let sentence;
+    while ((sentence = unspoken.match(SENTENCE))) {
+      spoken.push(tts.speak(sentence[0]));
+      unspoken = unspoken.slice(sentence[0].length);
+    }
+  }
+  spoken.push(tts.speak(unspoken));
+  await Promise.all(spoken);
+
+  vad.resume();
+}
+
+async function startCall() {
+  await vad.listen({
+    onSpeechStart: () => chat.status("Hearing you…"),
+    onSpeechEnd: (audio) => {
+      chat.status("Thinking…");
+      onVoice(audio).finally(() => chat.status("Listening"));
+    },
+    onSpeechCancel: () => chat.status("Listening"),
+
+    // STEP 6 · at each short pause, ask Smart Turn "has the user finished?"
++   isTurnComplete: async (audio) => {
++     const { complete, probability } = await turn.check(audio);
++     chat.note(`Turn detection: ${Math.round(probability * 100)}% sure you've finished`);
++     return complete;
++   },
+  });
+  chat.status("Listening");
+}
+          </script>
+        </section>
+
+
+        <section class="step" data-title="Wrap-up">
+          <h2>What you built</h2>
+          <p>A voice agent with real-time replies, hands-free listening and turn detection, in about 70 lines of code. Every model ran on your laptop: nothing you said left it.</p>
+          <h3>Things to try</h3>
+          <ul>
+            <li>Change <code>SYSTEM_PROMPT</code> to give the agent a different job, like a pirate or a quiz host, and press <b>Run</b>.</li>
+            <li>Try a different Kokoro voice, or speak in another language.</li>
+          </ul>
+          <p>The full project, with a production version of this agent, is in the <code>browser-native-conversational-agents</code> repo.</p>
+        </section>
+      </main>
+    </div>
+
+    <!-- The models box and the agent panel are moved into whichever step needs them. -->
+    <div id="models-box" class="box">
+      <h3>Models</h3>
+      <button id="download">Download models</button>
+      <ul id="models"></ul>
+    </div>
+
+    <div id="agent-box" class="box">
+      <div class="editor-bar">
+        <span class="label">agent.js</span>
+        <span class="spacer"></span>
+        <button id="fill" class="text">Fill in for me</button>
+        <button id="reset" class="text">Reset</button>
+        <button id="run" class="primary">Run</button>
+      </div>
+      <div class="editor"><pre id="highlight" aria-hidden="true"></pre><textarea id="code" spellcheck="false" autocomplete="off" aria-label="agent.js"></textarea></div>
+      <div id="error"></div>
+
+      <h3>Talk to the agent</h3>
+      <form id="form"><input id="input" placeholder="Type a message" autocomplete="off" /><button>Send</button></form>
+      <div class="controls">
+        <button id="hold">Hold to talk</button>
+        <button id="call">Start call</button>
+        <span id="status"></span>
+      </div>
+      <div id="chat"></div>
+    </div>
+
+    <footer>
+      <button id="back">Back</button>
+      <button id="next" class="primary">Next</button>
+    </footer>
+
+    <script type="module" src="./live.ts"></script>
+  </body>
+</html>

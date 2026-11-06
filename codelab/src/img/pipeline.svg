@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 300" width="920" height="300" font-family="Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5f6368"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#d93025"/>
+    </marker>
+  </defs>
+  <rect width="920" height="300" fill="#ffffff"/>
+
+  <!-- top row: audio in -->
+  <g>
+    <circle cx="60" cy="90" r="28" fill="#e8f0fe" stroke="#1a73e8" stroke-width="2"/>
+    <text x="60" y="95" text-anchor="middle" font-size="13" fill="#1a73e8">mic</text>
+  </g>
+
+  <g>
+    <rect x="130" y="55" width="150" height="70" rx="8" fill="#e6f4ea" stroke="#1e8e3e" stroke-width="2"/>
+    <text x="205" y="82" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Silero VAD</text>
+    <text x="205" y="102" text-anchor="middle" font-size="12" fill="#5f6368">is someone speaking?</text>
+  </g>
+
+  <g>
+    <rect x="320" y="55" width="150" height="70" rx="8" fill="#e6f4ea" stroke="#1e8e3e" stroke-width="2"/>
+    <text x="395" y="82" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Smart Turn v3</text>
+    <text x="395" y="102" text-anchor="middle" font-size="12" fill="#5f6368">have they finished?</text>
+  </g>
+
+  <g>
+    <rect x="510" y="55" width="150" height="70" rx="8" fill="#fef7e0" stroke="#f9ab00" stroke-width="2"/>
+    <text x="585" y="82" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Whisper tiny</text>
+    <text x="585" y="102" text-anchor="middle" font-size="12" fill="#5f6368">speech to text</text>
+  </g>
+
+  <g>
+    <rect x="700" y="55" width="180" height="70" rx="8" fill="#e8f0fe" stroke="#1a73e8" stroke-width="2"/>
+    <text x="790" y="82" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Gemini Nano</text>
+    <text x="790" y="102" text-anchor="middle" font-size="12" fill="#5f6368">Prompt API, streamed</text>
+  </g>
+
+  <line x1="88" y1="90" x2="128" y2="90" stroke="#5f6368" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="280" y1="90" x2="318" y2="90" stroke="#5f6368" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="470" y1="90" x2="508" y2="90" stroke="#5f6368" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="660" y1="90" x2="698" y2="90" stroke="#5f6368" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <text x="300" y="45" text-anchor="middle" font-size="11" fill="#5f6368">32 ms frames</text>
+  <text x="490" y="45" text-anchor="middle" font-size="11" fill="#5f6368">utterance audio</text>
+  <text x="680" y="45" text-anchor="middle" font-size="11" fill="#5f6368">transcript</text>
+
+  <!-- bottom row: audio out -->
+  <g>
+    <rect x="510" y="190" width="150" height="70" rx="8" fill="#fce8e6" stroke="#d93025" stroke-width="2"/>
+    <text x="585" y="217" text-anchor="middle" font-size="14" font-weight="bold" fill="#202124">Kokoro TTS</text>
+    <text x="585" y="237" text-anchor="middle" font-size="12" fill="#5f6368">sentence by sentence</text>
+  </g>
+
+  <g>
+    <circle cx="60" cy="225" r="28" fill="#fce8e6" stroke="#d93025" stroke-width="2"/>
+    <text x="60" y="230" text-anchor="middle" font-size="13" fill="#d93025">speaker</text>
+  </g>
+
+  <path d="M790 125 L790 225 L662 225" fill="none" stroke="#5f6368" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="800" y="180" font-size="11" fill="#5f6368">text chunks</text>
+
+  <line x1="508" y1="225" x2="90" y2="225" stroke="#5f6368" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="300" y="215" text-anchor="middle" font-size="11" fill="#5f6368">Web Audio playback</text>
+
+
+  <!-- legend -->
+  <text x="20" y="288" font-size="11" fill="#5f6368">Every box is a model running in the browser, each in its own Web Worker. Nothing leaves the device.</text>
+</svg>
