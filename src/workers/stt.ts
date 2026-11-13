@@ -8,7 +8,7 @@ import { SAMPLE_RATE } from "../constants";
 const MODEL_ID = "Xenova/whisper-tiny";
 // Keyword boost: Whisper treats this as the text spoken just before the audio, so it
 // spells these names the same way. A natural sentence works better than a bare list.
-const KEYWORDS = "Welcome to DevFest Abuja, hosted by GDG Abuja. Kerry is giving a talk on WebAI and browser AI, with Gemini nano and WebGPU.";
+const KEYWORDS = "E kaabo! Welcome to DevFest Lagos, hosted by GDG Lagos. Kerry is giving a talk on WebAI and browser AI, with Gemini nano and WebGPU.";
 let transcriber: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 let prompt: number[] = [];
 
