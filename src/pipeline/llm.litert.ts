@@ -35,7 +35,7 @@ export function createLiteRtLlm(): Llm {
   let engine: Promise<Engine> | null = null;
   let conversation: Promise<ChatInterface> | null = null;
   let tools: Tool[] = [];
-  let onToolCall: ((call: ToolCall) => void) | undefined;
+  let onToolCall: ((call: Omit<ToolCall, "title">) => void) | undefined;
   let onToolStart: (() => void) | undefined; // set by reply() while it streams
   let judge: Promise<Conversation> | null = null;
   let latest = ""; // the latest exchange, which is what ask() gets to see

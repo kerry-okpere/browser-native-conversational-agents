@@ -7,44 +7,117 @@ button,
 input {
   font: inherit;
   color: inherit;
-  padding: 0.6rem 0.9rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--paper);
 }
 
 button {
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--soft);
   cursor: pointer;
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--ink);
+  filter: brightness(0.96);
 }
 
-button:disabled,
-input:disabled {
-  opacity: 0.5;
+button:disabled {
+  opacity: 0.6;
   cursor: default;
 }
 
 button.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.1rem 2rem;
   background: var(--ink);
-  border-color: var(--ink);
   color: var(--paper);
+  font-size: 1.0625rem;
+  font-weight: 500;
 }
 
 button.danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--danger);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+button.quiet {
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+button.quiet:hover:not(:disabled) {
+  color: var(--ink);
+  filter: none;
+}
+
+/* A round button holding only an icon. */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--soft);
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+.icon:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.notice {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+.notice.error {
+  border-color: var(--danger);
   color: var(--danger);
 }
 
-input:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-progress {
-  width: 100%;
-  height: 4px;
-  accent-color: var(--ink);
+.spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
 }

@@ -5,7 +5,7 @@ import type { Call, StageName, Start, StartUpdate, WarmUp, WarmUpResult } from '
 import { STAGE_LABELS } from '../../constants';
 import { toMB, toSeconds } from '../../helpers';
 
-// What a row shows: the page-load warm-up result first, then Start's progress.
+// What a chip shows: the page-load warm-up result first, then Start's progress.
 type RowState = StartUpdate | WarmUpResult;
 
 const STAGES = Object.keys(STAGE_LABELS) as StageName[];
@@ -13,17 +13,15 @@ const STAGES = Object.keys(STAGE_LABELS) as StageName[];
 const describe = (state: RowState) => {
   switch (state.state) {
     case 'downloading':
-      return `Downloading… ${Math.floor(state.fraction * 100)}%`;
+      return `downloading ${Math.floor(state.fraction * 100)}%`;
     case 'loading':
-      return 'Loading and warming up…';
+      return 'loading';
     case 'ready':
-      return 'saved' in state && !state.saved
-        ? `Ready in ${toSeconds(state.ms)}, but not saved (storage quota exceeded)`
-        : `Ready in ${toSeconds(state.ms)}`;
+      return 'saved' in state && !state.saved ? `${toSeconds(state.ms)}, not saved` : toSeconds(state.ms);
     case 'skipped':
-      return 'Not downloaded yet, press Start';
+      return 'not downloaded';
     case 'failed':
-      return `Failed: ${state.message}`;
+      return 'failed';
   }
 };
 
@@ -31,8 +29,9 @@ const describe = (state: RowState) => {
 export class StartButton extends HTMLElement {
   start?: Start;
   private source?: Call;
-  // Once Start is pressed, its updates own the rows.
+  // Once Start is pressed, its updates own the chips.
   private started = false;
+  private states = new Map<StageName, RowState['state']>();
 
   connectedCallback() {
     const root = this.attachShadow({ mode: 'open' });
@@ -40,19 +39,20 @@ export class StartButton extends HTMLElement {
 
     root.querySelector('ul')!.innerHTML = STAGES.map((stage) => `
       <li data-stage="${stage}">
-        <span class="name">${STAGE_LABELS[stage]}</span>
-        <progress max="1" value="0"></progress>
-        <span class="status">Checking…</span>
+        <span class="fill"></span>
+        <span class="tick">✓</span>
+        <span class="spinner"></span>
+        <span class="text">${STAGE_LABELS[stage]}</span>
       </li>`).join('');
 
     const button = root.querySelector('button')!;
+    const label = root.querySelector('.label')!;
 
     button.addEventListener('click', async () => {
       if (!this.start) return;
 
       this.started = true;
       button.disabled = true;
-      button.textContent = 'Loading models…';
       this.notify('');
 
       let failed = false;
@@ -61,6 +61,8 @@ export class StartButton extends HTMLElement {
         this.setRow(stage, update);
         failed ||= update.state === 'failed';
         if (update.state === 'ready' && !update.saved) unsaved.push(STAGE_LABELS[stage]);
+        const ready = [...this.states.values()].filter((s) => s === 'ready').length;
+        label.textContent = `Loading models… ${ready} of ${STAGES.length}`;
       });
 
       // A model that loaded but isn't on the device afterwards didn't fit in
@@ -76,6 +78,7 @@ export class StartButton extends HTMLElement {
       }
 
       if (!failed) {
+        label.textContent = 'Opening the microphone…';
         try {
           await this.source?.start(); // opens the microphone; the page switches to the call view
         } catch (error) {
@@ -85,11 +88,11 @@ export class StartButton extends HTMLElement {
       }
 
       button.disabled = false;
-      button.textContent = failed ? 'Retry' : 'Start';
+      label.textContent = failed ? 'Retry' : 'Start a call';
     });
   }
 
-  /** The warm-up that init() ran at page load; its results fill the rows until Start takes over. */
+  /** The warm-up that init() ran at page load; its results fill the chips until Start takes over. */
   set warmUp(warmUp: WarmUp) {
     for (const stage of STAGES) {
       this.setRow(stage, { state: 'loading' });
@@ -101,6 +104,7 @@ export class StartButton extends HTMLElement {
 
   set call(call: Call) {
     this.source = call;
+    this.shadowRoot!.querySelector('voice-orb')!.call = call;
 
     // After storage is cleared nothing is downloaded any more.
     call.on('closed', ({ recovered }) => {
@@ -117,20 +121,12 @@ export class StartButton extends HTMLElement {
   }
 
   private setRow(stage: StageName, state: RowState) {
-    const row = this.shadowRoot!.querySelector(`[data-stage="${stage}"]`)!;
-    const progress = row.querySelector('progress')!;
-    const status = row.querySelector('.status')!;
-
-    status.textContent = describe(state);
-    status.className = `status ${state.state}`;
-
-    if (state.state === 'downloading') {
-      progress.value = state.fraction;
-    } else if (state.state === 'loading') {
-      progress.removeAttribute('value'); // busy, with no percentage to show
-    } else {
-      progress.value = state.state === 'ready' ? 1 : 0;
-    }
+    this.states.set(stage, state.state);
+    const chip = this.shadowRoot!.querySelector<HTMLElement>(`[data-stage="${stage}"]`)!;
+    chip.className = state.state;
+    chip.title = state.state === 'failed' ? state.message : '';
+    chip.querySelector('.text')!.textContent = `${STAGE_LABELS[stage]} · ${describe(state)}`;
+    chip.querySelector<HTMLElement>('.fill')!.style.width = state.state === 'downloading' ? `${state.fraction * 100}%` : '0';
   }
 }
 

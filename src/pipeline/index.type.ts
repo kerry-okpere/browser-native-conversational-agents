@@ -55,12 +55,16 @@ export type Tool = {
   /** JSON schema of the arguments; omit when the tool takes none. */
   parameters?: object;
   run: (args: Record<string, unknown>) => unknown;
+  /** A few words for the screen, like "Lights off". Defaults to the tool's name. */
+  title?: (args: Record<string, unknown>) => string;
 };
 
 /** A tool the agent called. It is sent again as the call progresses, with the same id. */
 export type ToolCall = {
   id: number;
   name: string;
+  /** The tool's `title` for these arguments. */
+  title: string;
   arguments: Record<string, unknown>;
   status: "started" | "completed" | "error";
   result?: unknown;
@@ -72,7 +76,7 @@ export type Llm = Stage & {
    * Give the model tools to call during `reply`. `onCall` reports each call.
    * Missing when the model has no tool calling; then `ask` decides instead.
    */
-  useTools?: (tools: Tool[], onCall: (call: ToolCall) => void) => void;
+  useTools?: (tools: Tool[], onCall: (call: Omit<ToolCall, "title">) => void) => void;
   /**
    * Whether Chrome has the model, needs to download it, or can't run it.
    * Starting a download requires a user gesture, so when this isn't
@@ -181,7 +185,8 @@ export type WarmUpResult =
 /** One result per pipeline stage; each settles independently. */
 export type WarmUp = Record<StageName, Promise<WarmUpResult>>;
 
-export type CallState = "idle" | "starting" | "listening" | "hearing" | "thinking" | "speaking";
+/** "ended" shows the call-ended screen; "idle" the start screen; the rest the call view. */
+export type CallState = "idle" | "starting" | "listening" | "hearing" | "thinking" | "speaking" | "ended";
 
 /** Something the user said or typed. Durations are ms from the end of their turn. */
 export type UserMessage = {

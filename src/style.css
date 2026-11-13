@@ -1,65 +1,148 @@
 /* Design tokens. Components read these through their shadow roots. */
 :root {
-  --ink: #111827;
-  --muted: #6b7280;
-  --line: #e5e7eb;
-  --surface: #f6f7f9;
-  --accent: #2563eb;
-  --ok: #15803d;
-  --danger: #b91c1c;
-  --radius: 10px;
-  --paper: white;
+  --paper: #f7f5f0;
+  --ink: #1a1a1a;
+  --muted: #6b6960;
+  --faint: #a19e95;
+  --line: #e8e5dc;
+  --surface: #ffffff;
+  --soft: #f1efe8;
+  --accent: #4b3fb3;
+  --accent-soft: #e9e6fb;
+  --ok: #2f9e5b;
+  --danger: #d9452b;
+  --radius: 16px;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+  --display: "Space Grotesk", Inter, system-ui, sans-serif;
 }
 
-/* "Lights off": the set_lights tool switches this. */
+/* Dark follows the system, unless the set_lights tool has said otherwise. */
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="light"]) {
+    --paper: #0b0d12;
+    --ink: #eceef2;
+    --muted: #9ba0ae;
+    --faint: #5a5f6d;
+    --line: rgba(255, 255, 255, 0.1);
+    --surface: #151924;
+    --soft: rgba(255, 255, 255, 0.07);
+    --accent: #b9ccff;
+    --accent-soft: rgba(91, 140, 255, 0.16);
+    --ok: #3ddc84;
+    --danger: #ff5a4e;
+    --shadow: none;
+  }
+}
+
 body[data-theme="dark"] {
-  --ink: #f3f4f6;
-  --muted: #9ca3af;
-  --line: #374151;
-  --surface: #1f2937;
-  --paper: #0b1020;
+  --paper: #0b0d12;
+  --ink: #eceef2;
+  --muted: #9ba0ae;
+  --faint: #5a5f6d;
+  --line: rgba(255, 255, 255, 0.1);
+  --surface: #151924;
+  --soft: rgba(255, 255, 255, 0.07);
+  --accent: #b9ccff;
+  --accent-soft: rgba(91, 140, 255, 0.16);
+  --ok: #3ddc84;
+  --danger: #ff5a4e;
+  --shadow: none;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  font-family: Inter, system-ui, sans-serif;
   color: var(--ink);
   background: var(--paper);
-  transition: background 0.4s;
+  transition: background 0.4s, color 0.4s;
+}
+
+/* The header: the event and the talk, and the call's length while one is on. */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.75rem 3rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.talk {
+  color: var(--faint);
+}
+
+.timer {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  color: var(--faint);
 }
 
 main {
-  max-width: 440px;
-  margin: 0 auto;
-  padding: 3rem 1.25rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 3rem 2.5rem;
+  box-sizing: border-box;
 }
 
-/* The call view is wider than the start screen: orb on the left, chat on the right. */
-body:not([data-call="idle"]) main {
-  max-width: 1040px;
-}
-
+/* The call view: the orb's stage on the left, the transcript on the right. */
 .call {
-  display: grid;
-  grid-template-columns: 1fr 480px;
-  align-items: center;
-  gap: 2rem;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2.5rem;
+  min-height: 0;
 }
 
 .stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+}
+
+/* Three screens: start while idle, the call-ended screen after a call, the call view otherwise. */
+start-button,
+call-ended,
+.call {
+  display: none;
+}
+
+body[data-call="idle"] start-button,
+body[data-call="ended"] call-ended {
+  display: flex;
+  flex: 1;
+}
+
+body:not([data-call="idle"]):not([data-call="ended"]) .call {
   display: grid;
-  gap: 1.5rem;
 }
 
 /* On a narrow screen the chat goes under the orb. */
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .call {
     grid-template-columns: 1fr;
   }
-}
 
-/* Start screen while idle, call view otherwise. */
-body[data-call="idle"] .call,
-body:not([data-call="idle"]) start-button {
-  display: none;
+  .top,
+  main {
+    padding-inline: 1.25rem;
+  }
 }

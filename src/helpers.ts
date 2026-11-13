@@ -2,6 +2,9 @@ import { ORB_BANDS, SAMPLE_RATE } from "./constants";
 
 export const toSeconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
 
+/** 83000 → "1:23" */
+export const toClock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+
 export const toMB = (bytes = 0) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 export const timestamp = () => new Date().toLocaleTimeString([], { hour12: false });

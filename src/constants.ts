@@ -1,5 +1,11 @@
 import type { CallState, StageName } from "./pipeline/index.type";
 
+// The event the agent is at. The prompt, the speech keywords and the header use these.
+export const CITY = "Lagos";
+export const EVENT = `DevFest ${CITY}`;
+export const HOST = `GDG ${CITY}`;
+export const TALK = "WebAI";
+
 export const SAMPLE_RATE = 16000;
 
 export const TRANSFORMERS_CACHE = "transformers-cache";
@@ -7,9 +13,9 @@ export const TRANSFORMERS_CACHE = "transformers-cache";
 export const STAGE_LABELS: Record<StageName, string> = {
   vad: "Voice detection",
   turn: "Turn detection",
-  stt: "Speech-to-text",
-  llm: "LLM",
-  tts: "Text-to-speech",
+  stt: "Speech to text",
+  llm: "Gemma 4",
+  tts: "Voice",
 };
 
 export const METRICS = {
@@ -26,6 +32,18 @@ export const STATE_LABELS: Record<CallState, string> = {
   hearing: "Hearing you",
   thinking: "Thinking",
   speaking: "Speaking",
+  ended: "Call ended",
+};
+
+// A line under the state, for whoever is on the mic.
+export const STATE_HINTS: Record<CallState, string> = {
+  idle: "",
+  starting: "Opening the microphone…",
+  listening: "Say something, or type on the right",
+  hearing: "Go on, I'm listening",
+  thinking: "Working on a reply",
+  speaking: "",
+  ended: "",
 };
 
 export const VAD = {
@@ -49,8 +67,8 @@ export const TURN = {
 // How many frequency bands the orb draws.
 export const ORB_BANDS = 32;
 
-// Where the audience can build this agent themselves; shown as a QR code on request.
-export const CODELAB_URL = "https://kerry-okpere.github.io/browser-native-conversational-agents/";
+// The link the agent shows as a QR code on request: where this app will live once deployed.
+export const QR_URL = "https://kerry-okpere.github.io/browser-native-conversational-agents/";
 
 // LiteRT-LM: the Gemma 4 web build, kept in Cache Storage after the first download.
 export const LITERT_CACHE = "litert-lm-cache";

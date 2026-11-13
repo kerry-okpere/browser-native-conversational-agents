@@ -1,6 +1,6 @@
 // The agent's tools. The app runs them; the model only decides when to call them.
 import type { Call, Tool } from "./pipeline/index.type";
-import { CODELAB_URL } from "./constants";
+import { QR_URL } from "./constants";
 
 export const createTools = (call: Call): Tool[] => [
   {
@@ -15,12 +15,14 @@ export const createTools = (call: Call): Tool[] => [
       document.body.dataset.theme = on ? "light" : "dark";
       return `The lights are now ${on ? "on" : "off"}.`;
     },
+    title: ({ on }) => (on ? "Lights on" : "Lights off"),
   },
   {
-    name: "show_codelab",
-    description: "Show a QR code in the chat linking to the codelab, where the audience can build an agent like you.",
+    name: "show_qr_code",
+    description: "Show a QR code in the chat that links to this app, so the audience can open it on their phones.",
     // A `qr` field in a tool result is drawn as a QR code in the chat.
-    run: () => ({ qr: CODELAB_URL, shown: true }),
+    run: () => ({ qr: QR_URL, shown: true }),
+    title: () => "QR code shown",
   },
   {
     name: "end_call",
@@ -30,5 +32,6 @@ export const createTools = (call: Call): Tool[] => [
       call.hangUp(); // after the goodbye has been spoken
       return "The call ends once you finish this reply.";
     },
+    title: () => "Hanging up",
   },
 ];

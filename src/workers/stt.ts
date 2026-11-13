@@ -3,12 +3,12 @@ import {
   type AutomaticSpeechRecognitionPipeline,
   type ProgressInfo,
 } from "@huggingface/transformers";
-import { SAMPLE_RATE } from "../constants";
+import { EVENT, HOST, SAMPLE_RATE } from "../constants";
 
 const MODEL_ID = "Xenova/whisper-tiny";
 // Keyword boost: Whisper treats this as the text spoken just before the audio, so it
 // spells these names the same way. A natural sentence works better than a bare list.
-const KEYWORDS = "Hi! Welcome to DevFest Lagos, hosted by GDG Lagos. Kerry is giving a talk on WebAI and browser AI, with Gemini nano and WebGPU.";
+const KEYWORDS = `Hi! Welcome to ${EVENT}, hosted by ${HOST}. Kerry is giving a talk on WebAI and browser AI, with Gemini nano and WebGPU.`;
 let transcriber: Promise<AutomaticSpeechRecognitionPipeline> | null = null;
 let prompt: number[] = [];
 

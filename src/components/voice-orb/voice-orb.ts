@@ -2,80 +2,76 @@ import html from './voice-orb.html?raw';
 import css from './voice-orb.css?inline';
 import shared from '../shared.css?inline';
 import type { Call, CallState } from '../../pipeline/index.type';
-import { STATE_LABELS } from '../../constants';
+import { STATE_HINTS, STATE_LABELS } from '../../constants';
 
-const SIZE = 280; // canvas width and height in CSS pixels
-const RADIUS = SIZE * 0.3; // the ring at rest
-const DOTS = 2600;
-const DOT = 1.3; // dot size in CSS pixels
-const LOBES = 5; // how many times the spectrum repeats around the ring
-
-// How the dots behave, like sand held by a magnet: sound shakes them loose
-// and the pull draws them back to where they rest.
-const PULL = 0.07; // strength of the pull back to rest
-const DRAG = 0.86; // how quickly a moving dot slows down
-const SHAKE = 0.045; // how hard sound throws the dots
-const STILLNESS = 0.012; // a little movement even in silence, so it looks alive
+// A sphere of dots: latitude rings, each a circle of dots, seen from a tilt.
+const RINGS = 14;
+const PER_RING = 100;
+const TILT = (-35 * Math.PI) / 180; // the top leans out toward the viewer
+const ROLL = (-45 * Math.PI) / 180; // the whole sphere turned in the screen plane
+const SPREAD = 0.8; // the sphere's radius as a fraction of the canvas's
 
 // Which design token colours the orb in each state.
 const COLOURS: Record<CallState, string> = {
-  idle: '--line',
+  idle: '--faint',
   starting: '--muted',
   listening: '--ink',
-  hearing: '--accent',
+  hearing: '--accent', // your voice colours it
   thinking: '--muted',
   speaking: '--ink',
+  ended: '--faint',
 };
 
-// Distances below are fractions of the ring's radius.
-type Dot = {
-  angle: number;
-  rest: number; // where it sits relative to the ring: 0 on it, negative inside
-  offset: number; // how far sound has pushed it from rest
-  speed: number;
-  loose: number; // how easily sound moves it
-  alpha: number;
+// How fast it turns on its axis, in radians per frame.
+const SPIN: Record<CallState, number> = {
+  idle: 0.002,
+  starting: 0.003,
+  listening: 0.003,
+  hearing: 0.004,
+  thinking: 0.014,
+  speaking: 0.004,
+  ended: 0,
 };
 
-// Random numbers clustered near zero, for dots that thin out with distance.
-const falloff = (scale: number) => -Math.log(1 - Math.random()) * scale;
-const spread = () => (Math.random() + Math.random() + Math.random()) / 1.5 - 1; // roughly bell-shaped, -1 to 1
+// How much a ring dilates with the sound in its band of the spectrum.
+const GAIN: Partial<Record<CallState, number>> = { hearing: 0.7, speaking: 0.5 };
+// No ring swells past this, however loud or shrill the sound.
+const MAX_SWELL = 0.35;
+// Which band each ring follows, scrambled so neighbouring rings move independently.
+const BAND_OF_RING = Array.from({ length: RINGS }, (_, i) => (i * 7) % RINGS);
 
-function createDot(): Dot {
-  const angle = Math.random() * Math.PI * 2;
-  const kind = Math.random();
+type Dot = { ring: number; angle: number };
 
-  // Most dots form the bright rim.
-  if (kind < 0.55) {
-    return { angle, rest: spread() * 0.02, offset: 0, speed: 0, loose: 0.5 + Math.random() * 0.6, alpha: 0.9 };
-  }
-  // A haze of grain inside the rim that fades toward the centre.
-  if (kind < 0.9) {
-    const depth = Math.min(0.75, falloff(0.14));
-    return { angle, rest: -depth, offset: 0, speed: 0, loose: 0.25, alpha: 0.55 * (1 - depth / 0.75) + 0.08 };
-  }
-  // A few strays just outside, which scatter the furthest.
-  return { angle, rest: falloff(0.05), offset: 0, speed: 0, loose: 1.6, alpha: 0.5 };
+const dots: Dot[] = [];
+for (let ring = 0; ring < RINGS; ring++) {
+  for (let i = 0; i < PER_RING; i++) dots.push({ ring, angle: (i / PER_RING) * Math.PI * 2 });
 }
+// Each ring's radius and height on a unit sphere.
+const ringRadius = Array.from({ length: RINGS }, (_, i) => Math.cos(-Math.PI / 2 + ((i + 1) / (RINGS + 1)) * Math.PI) * SPREAD);
+const ringHeight = Array.from({ length: RINGS }, (_, i) => Math.sin(-Math.PI / 2 + ((i + 1) / (RINGS + 1)) * Math.PI) * SPREAD);
 
-/** A ring of fine dots that scatters with the voice of whoever is talking. */
+/** A sphere of dots that turns, swells with whoever is talking, and draws in to think. */
 export class VoiceOrb extends HTMLElement {
   private source?: Call;
   private state: CallState = 'idle';
   private frame = 0;
-  private level = 0; // smoothed loudness
-  private dots = Array.from({ length: DOTS }, createDot);
+  private size = 360;
+  private spin = 0;
+  private scale = 1; // smoothed: thinking draws the sphere in
+  private levels = new Float32Array(RINGS); // smoothed sound per ring
 
   connectedCallback() {
     const root = this.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>${shared}${css}</style>${html}`;
 
+    this.size = Number(this.getAttribute('size')) || this.size;
     const canvas = root.querySelector('canvas')!;
-    const scale = window.devicePixelRatio || 1;
-    canvas.width = SIZE * scale;
-    canvas.height = SIZE * scale;
-    canvas.style.width = canvas.style.height = `${SIZE}px`;
-    canvas.getContext('2d')!.scale(scale, scale);
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = this.size * ratio;
+    canvas.height = this.size * ratio;
+    canvas.style.width = canvas.style.height = `${this.size}px`;
+    canvas.getContext('2d')!.scale(ratio, ratio);
+    this.draw();
   }
 
   disconnectedCallback() {
@@ -86,52 +82,59 @@ export class VoiceOrb extends HTMLElement {
     this.source = call;
     call.on('state', (state) => {
       this.state = state;
-      this.shadowRoot!.querySelector('.caption')!.textContent = STATE_LABELS[state];
-
-      cancelAnimationFrame(this.frame);
-      if (state !== 'idle') this.draw();
+      const root = this.shadowRoot!;
+      root.querySelector('.caption')!.textContent = STATE_LABELS[state];
+      root.querySelector('.hint')!.textContent = STATE_HINTS[state];
     });
   }
 
   private draw = () => {
     this.frame = requestAnimationFrame(this.draw);
+    if (!this.checkVisibility()) return; // another screen is up
 
-    const bands = this.source!.bands();
-    const loudness = bands.reduce((sum, band) => sum + band, 0) / bands.length;
-    this.level += (loudness - this.level) * 0.2;
+    const { size, state } = this;
+    const centre = size / 2;
+    const radius = size / 2;
+    const dot = Math.max(1.5, size / 160);
 
-    // While thinking there is no sound, so the ring breathes slowly instead.
-    const thinking = this.state === 'thinking';
-    const breath = thinking ? 0.04 * Math.sin(performance.now() / 350) : 0;
-    const ring = RADIUS * (1 + breath + this.level * 0.25);
+    // The sound dilates the rings: each ring follows one band of the spectrum.
+    const gain = GAIN[state] ?? 0;
+    const bands = gain && this.source ? this.source.bands() : null;
+    for (let ring = 0; ring < RINGS; ring++) {
+      const target = bands ? Math.min(MAX_SWELL, bands[Math.floor((BAND_OF_RING[ring] / (RINGS - 1)) * (bands.length - 1))] * gain) : 0;
+      this.levels[ring] += (target - this.levels[ring]) * 0.45; // quick to swell, so it feels loose
+    }
+
+    this.spin += SPIN[state];
+    this.scale += ((state === 'thinking' ? 0.85 : 1) - this.scale) * 0.08;
+    // While thinking a bright pulse travels around the sphere.
+    const pulse = state === 'thinking' ? (performance.now() / 500) % (Math.PI * 2) : -1;
 
     const context = this.shadowRoot!.querySelector('canvas')!.getContext('2d')!;
-    context.clearRect(0, 0, SIZE, SIZE);
-    context.fillStyle = getComputedStyle(this).getPropertyValue(COLOURS[this.state]);
+    context.clearRect(0, 0, size, size);
+    context.fillStyle = getComputedStyle(this).getPropertyValue(COLOURS[state]);
 
-    for (const dot of this.dots) {
-      // The sound at this dot's place on the ring: the spectrum repeats in
-      // lobes around it, on top of the overall loudness, so the whole ring
-      // stirs and the lobes scatter the most.
-      const place = Math.abs(Math.sin((dot.angle * LOBES) / 2));
-      const energy = bands[Math.floor(place * (bands.length - 1))] * 0.7 + this.level * 0.6 + STILLNESS;
+    for (const { ring, angle } of dots) {
+      const a = angle + this.spin;
+      const r = ringRadius[ring] * (1 + this.levels[ring]) * radius * this.scale;
+      const x0 = Math.cos(a) * r;
+      const z0 = Math.sin(a) * r;
+      const y0 = ringHeight[ring] * radius * this.scale;
+      // Tilt toward the viewer, then roll in the screen plane.
+      const y1 = y0 * Math.cos(TILT) - z0 * Math.sin(TILT);
+      const z = y0 * Math.sin(TILT) + z0 * Math.cos(TILT);
+      const x = x0 * Math.cos(ROLL) - y1 * Math.sin(ROLL);
+      const y = x0 * Math.sin(ROLL) + y1 * Math.cos(ROLL);
 
-      // Sound throws the dot, mostly outward; the pull brings it back.
-      dot.speed += (Math.random() - 0.3) * energy * dot.loose * SHAKE;
-      dot.speed -= dot.offset * PULL;
-      dot.speed *= DRAG;
-      dot.offset += dot.speed;
-
-      if (thinking) dot.angle += 0.004; // a slow turn while it works
-
-      const distance = ring * (1 + dot.rest + dot.offset);
-      context.globalAlpha = dot.alpha;
-      context.fillRect(
-        SIZE / 2 + distance * Math.cos(dot.angle) - DOT / 2,
-        SIZE / 2 + distance * Math.sin(dot.angle) - DOT / 2,
-        DOT,
-        DOT,
-      );
+      const depth = (z / radius + 1) / 2; // 0 at the back, 1 at the front
+      let alpha = 0.12 + depth * 0.88;
+      if (pulse >= 0) {
+        const away = Math.abs(((a - pulse + Math.PI) % (Math.PI * 2)) - Math.PI);
+        alpha = Math.min(1, alpha + Math.max(0, 1 - away / 0.7) * 0.8);
+      }
+      const d = dot * (0.6 + depth * 0.8);
+      context.globalAlpha = alpha;
+      context.fillRect(centre + x - d / 2, centre + y - d / 2, d, d);
     }
     context.globalAlpha = 1;
   };

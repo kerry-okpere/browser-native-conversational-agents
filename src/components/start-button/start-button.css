@@ -1,60 +1,89 @@
 .start {
-  display: grid;
-  gap: 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.25rem;
+  padding-bottom: 4rem; /* room for the footer of chips */
+  text-align: center;
 }
 
 h1 {
-  margin: 0;
-  font-size: 1.5rem;
+  max-width: 640px;
+  font-size: 3.25rem;
 }
 
-.intro {
-  margin: -0.5rem 0 0;
-  color: var(--muted);
-}
-
-ul {
-  display: grid;
-  gap: 0.75rem;
+/* One chip per model, showing where it has got to. A footer, fixed like the header. */
+.chips {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.625rem;
   margin: 0;
-  padding: 0;
+  padding: 1.5rem 3rem;
   list-style: none;
-  font-size: 0.875rem;
 }
 
 li {
-  display: grid;
-  grid-template-columns: 8rem 1fr;
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
   align-items: center;
-  gap: 0.15rem 0.75rem;
-}
-
-.name {
-  font-weight: 600;
-}
-
-.status {
-  grid-column: 2;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 
-.status.ready {
+li > * {
+  position: relative;
+}
+
+.tick {
+  display: none;
   color: var(--ok);
 }
 
-.status.failed {
-  color: var(--danger);
+.spinner {
+  display: none;
+  color: var(--faint);
 }
 
-.notice {
-  margin: 0;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  font-size: 0.875rem;
+.ready .tick,
+.loading .spinner {
+  display: block;
 }
 
-.notice.error {
+.skipped {
+  border-style: dashed;
+  color: var(--faint);
+}
+
+.failed {
   border-color: var(--danger);
   color: var(--danger);
+}
+
+/* The download fills the chip from the left. */
+.fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: var(--accent-soft);
+  transition: width 0.3s;
+}
+
+@media (max-width: 720px) {
+  h1 {
+    font-size: 2.25rem;
+  }
 }

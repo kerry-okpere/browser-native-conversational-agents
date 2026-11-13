@@ -62,7 +62,11 @@ export class VoiceCall implements Call {
   /** `tools` gets this call, so a tool can act on it (end_call does). */
   constructor(stages: Stages, tools: (call: Call) => Tool[] = () => []) {
     this.stages = stages;
-    stages.llm.useTools?.(tools(this), (call) => this.emit("tool", call));
+    const list = tools(this);
+    const titles = new Map(list.map((tool) => [tool.name, tool.title]));
+    stages.llm.useTools?.(list, (call) =>
+      this.emit("tool", { ...call, title: titles.get(call.name)?.(call.arguments) ?? call.name }),
+    );
   }
 
   hangUp() {
@@ -78,7 +82,7 @@ export class VoiceCall implements Call {
   }
 
   async start() {
-    if (this.current !== "idle") return;
+    if (this.current !== "idle" && this.current !== "ended") return;
     const { vad, turn, llm } = this.stages;
 
     this.setState("starting");
@@ -111,7 +115,7 @@ export class VoiceCall implements Call {
 
   async send(text: string) {
     const message = text.trim() || (this.image ? DESCRIBE_IMAGE : "");
-    if (!message || this.current === "idle" || this.current === "starting") return;
+    if (!message || this.current === "idle" || this.current === "ended" || this.current === "starting") return;
 
     this.stages.tts.stop(); // typing interrupts the agent
     const turn = ++this.turn;
@@ -130,19 +134,20 @@ export class VoiceCall implements Call {
   }
 
   end() {
-    if (this.current === "idle") return;
+    if (this.current === "idle" || this.current === "ended") return;
     const { vad, llm, tts } = this.stages;
 
     this.turn++;
     vad.stopListening();
     tts.stop();
     llm.destroy(); // the next call starts a new conversation
-    this.setState("idle");
+    this.setState("ended");
   }
 
   async close() {
     const { vad, turn, stt, llm, tts } = this.stages;
     this.end();
+    this.setState("idle"); // the start screen, since the models are going
 
     const before = (await navigator.storage.estimate()).usage ?? 0;
     // Chrome owns the LLM's model, so a page can only unload it, not delete it.

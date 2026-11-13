@@ -9,32 +9,35 @@ import { timestamp, toSeconds } from '../../helpers';
 // Where each kind of message's timings are measured from.
 const ORIGIN = { speech: 'From end of speech', text: 'From Send' };
 
-const metric = (label: string, ms?: number) => (ms === undefined ? '' : `${label} ${toSeconds(ms)}`);
-const join = (parts: (string | undefined)[]) => parts.filter(Boolean).join(' · ');
+// A short timing with the full description on hover.
+type Note = { text: string; title: string };
 
-const describeUser = (message: UserMessage) =>
-  join([
-    message.at,
-    message.finalSegment !== undefined
-      ? `${ORIGIN.speech}: ${metric(METRICS.finalSegment, message.finalSegment)}` +
-        ` (waiting for silence ${toSeconds(message.vadWait ?? 0)}` +
-        (message.turn
-          ? `, turn judged ${Math.round(message.turn.probability * 100)}% finished in ${toSeconds(message.turn.ms)})`
-          : ', ended by silence)')
-      : '',
-  ]);
+const note = (short: string, ms: number | undefined, long: string): Note | undefined =>
+  ms === undefined ? undefined : { text: `${short} ${toSeconds(ms)}`, title: `${long} ${toSeconds(ms)}` };
+
+const describeUser = (message: UserMessage): Note[] => {
+  if (message.finalSegment === undefined) return [];
+  const how = message.turn
+    ? `turn judged ${Math.round(message.turn.probability * 100)}% finished in ${toSeconds(message.turn.ms)}`
+    : 'ended by silence';
+  return [
+    {
+      text: `turn ended ${toSeconds(message.finalSegment)}`,
+      title: `${ORIGIN.speech}: ${METRICS.finalSegment} ${toSeconds(message.finalSegment)} (waiting for silence ${toSeconds(message.vadWait ?? 0)}, ${how})`,
+    },
+  ];
+};
+
+const describeReply = (reply: ReplyMessage): Note[] =>
+  [
+    note('first word', reply.firstText, `${ORIGIN[reply.from]}: ${METRICS.firstText}`),
+    note('voice', reply.firstAudio, METRICS.firstAudio),
+    note('done', reply.lastText, METRICS.lastText),
+  ].filter((n): n is Note => Boolean(n));
 
 const describeTool = (call: ToolCall) =>
-  `${call.name}(${JSON.stringify(call.arguments)})\n→ ` +
+  `${call.name}(${JSON.stringify(call.arguments)}) → ` +
   { started: 'running…', completed: JSON.stringify(call.result), error: `failed: ${call.error}` }[call.status];
-
-const describeReply = (reply: ReplyMessage) =>
-  join([
-    reply.at,
-    reply.firstText !== undefined ? `${ORIGIN[reply.from]}: ${metric(METRICS.firstText, reply.firstText)}` : '',
-    metric(METRICS.lastText, reply.lastText),
-    metric(METRICS.firstAudio, reply.firstAudio),
-  ]);
 
 /** The written record of the call, and a way to type instead of speaking. */
 export class ChatBox extends HTMLElement {
@@ -61,10 +64,13 @@ export class ChatBox extends HTMLElement {
 
     const root = this.shadowRoot!;
     const messages = root.querySelector('.messages')!;
+    const turns = root.querySelector('.turns')!;
     const input = root.querySelector<HTMLInputElement>('input[type=text]')!;
-    const send = root.querySelector('button')!;
+    const send = root.querySelector<HTMLButtonElement>('.send')!;
     const attach = root.querySelector<HTMLLabelElement>('.attach')!;
     const picker = root.querySelector<HTMLInputElement>('input[type=file]')!;
+    const picture = root.querySelector('.picture')!;
+    const icon = picture.innerHTML;
 
     // The image waits on the button as a thumbnail until it goes out with the
     // next message; clicking the thumbnail removes it.
@@ -76,8 +82,9 @@ export class ChatBox extends HTMLElement {
     };
     const showAttached = (image: Blob | null) => {
       attach.classList.toggle('chosen', Boolean(image));
-      attach.querySelector('span')!.replaceChildren(image ? thumbnail(image) : 'Image');
-      attach.title = image ? 'Remove the image' : 'Show the agent an image';
+      if (image) picture.replaceChildren(thumbnail(image));
+      else picture.innerHTML = icon;
+      attach.title = image ? 'Remove the picture' : 'Show the agent a picture';
     };
 
     picker.addEventListener('change', () => {
@@ -92,21 +99,35 @@ export class ChatBox extends HTMLElement {
       call.attach(null);
       showAttached(null);
     });
+    attach.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        attach.click();
+      }
+    });
 
-    // Adds a bubble with a small line under it for the timestamp and timings.
-    const addMessage = (role: 'user' | 'assistant' | 'tool') => {
-      const message = document.createElement('p');
-      message.className = `message ${role}`;
-
-      const meta = document.createElement('p');
-      meta.className = `meta meta-${role}`;
-
-      messages.append(message, meta);
-      return { message, meta };
+    // A message: who said it, a bubble, and a footnote of timings.
+    const addRow = (role: 'user' | 'assistant' | 'tool', label: string) => {
+      const row = document.createElement('div');
+      row.className = `row ${role}`;
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = label;
+      const bubble = document.createElement(role === 'tool' ? 'div' : 'p');
+      bubble.className = role === 'tool' ? 'chips' : 'bubble';
+      const foot = document.createElement('span');
+      foot.className = 'foot';
+      row.append(who, bubble, foot);
+      messages.append(row);
+      return { row, bubble, foot };
     };
+    const showNotes = (foot: Element, notes: Note[]) =>
+      foot.replaceChildren(...notes.map((n) => Object.assign(document.createElement('span'), { textContent: n.text, title: n.title })));
 
     // A reply arrives many times as it is generated; update its bubble in place.
-    const replies = new Map<number, ReturnType<typeof addMessage>>();
+    const replies = new Map<number, ReturnType<typeof addRow>>();
+    const tools = new Map<number, HTMLElement>();
+    let count = 0;
 
     // Keeps the newest message in view.
     const scrollToBottom = () => {
@@ -114,45 +135,52 @@ export class ChatBox extends HTMLElement {
     };
 
     call.on('user', (user) => {
-      const { message, meta } = addMessage('user');
-      message.textContent = user.text;
+      const { bubble, foot } = addRow('user', `You · ${user.at}`);
+      bubble.textContent = user.text;
       if (user.image) {
-        message.prepend(thumbnail(user.image));
-        message.classList.toggle('image-only', !user.text);
+        bubble.prepend(thumbnail(user.image));
+        bubble.classList.toggle('image-only', !user.text);
         showAttached(null); // it has been sent
       }
-      meta.textContent = describeUser(user);
+      showNotes(foot, describeUser(user));
+      turns.textContent = `${++count} ${count === 1 ? 'turn' : 'turns'}`;
       scrollToBottom();
     });
 
     call.on('reply', (reply) => {
-      const bubble = replies.get(reply.id) ?? addMessage('assistant');
-      replies.set(reply.id, bubble);
+      const row = replies.get(reply.id) ?? addRow('assistant', `Agent · ${reply.at ?? timestamp()}`);
+      replies.set(reply.id, row);
 
-      bubble.message.textContent = reply.error ? `Something went wrong: ${reply.error}` : reply.text;
-      bubble.message.classList.toggle('error', Boolean(reply.error));
-      bubble.meta.textContent = describeReply(reply);
+      row.bubble.textContent = reply.error ? `Something went wrong: ${reply.error}` : reply.text;
+      row.row.classList.toggle('error', Boolean(reply.error));
+      showNotes(row.foot, describeReply(reply));
       scrollToBottom();
     });
 
-    // A tool call is reported as it starts and when it finishes; update its card in place.
-    const tools = new Map<number, ReturnType<typeof addMessage>>();
-
+    // What the agent did: one chip per tool call, updated as it runs. The chips
+    // of one turn share a row.
+    let chipRow: ReturnType<typeof addRow> | null = null;
     call.on('tool', (tool) => {
-      const card = tools.get(tool.id) ?? addMessage('tool');
-      tools.set(tool.id, card);
+      let chip = tools.get(tool.id);
+      if (!chip) {
+        if (!chipRow || chipRow.row !== messages.lastElementChild) chipRow = addRow('tool', 'Agent did');
+        chip = document.createElement('span');
+        chipRow.bubble.append(chip);
+        tools.set(tool.id, chip);
+      }
+      chip.className = `chip ${tool.status === 'started' ? 'running' : tool.status === 'error' ? 'failed' : ''}`;
+      chip.textContent = tool.status === 'error' ? `${tool.title} failed` : tool.title;
+      chip.title = describeTool(tool);
 
-      card.message.textContent = describeTool(tool);
-      card.message.classList.toggle('error', tool.status === 'error');
       // A result with a `qr` link is drawn as a QR code, for the room to scan.
       const qr = (tool.result as { qr?: string } | undefined)?.qr;
-      if (qr) {
+      if (qr && chipRow && !chipRow.row.querySelector('.qr')) {
         const img = document.createElement('img');
+        img.className = 'qr';
         img.alt = `QR code for ${qr}`;
-        QRCode.toDataURL(qr, { width: 640, margin: 1 }).then((src) => (img.src = src));
-        card.message.append(img);
+        QRCode.toDataURL(qr, { width: 512, margin: 1 }).then((src) => (img.src = src));
+        chipRow.foot.before(img);
       }
-      card.meta.textContent = `${timestamp()} · Tool call`;
       scrollToBottom();
     });
 
@@ -162,10 +190,14 @@ export class ChatBox extends HTMLElement {
         messages.replaceChildren();
         replies.clear();
         tools.clear();
+        chipRow = null;
+        count = 0;
+        turns.textContent = '0 turns';
+        showAttached(null);
       }
 
-      // Typing can step in at any time, except while a reply is being written.
-      const busy = state === 'starting' || state === 'thinking';
+      // Typing can step in at any time, except while a reply is being written or after the call.
+      const busy = state === 'starting' || state === 'thinking' || state === 'ended';
       input.disabled = send.disabled = busy;
     });
   }
