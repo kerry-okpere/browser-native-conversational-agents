@@ -1,11 +1,9 @@
 // LLM stage on LiteRT-LM: Gemma 4 running on WebGPU in the page, instead of Chrome's built-in model.
-import { AutoToolChat, Backend, Engine, SamplerType, type ChatInterface, type Conversation, type JsonValue, type Message, type Schema } from "@litert-lm/core";
+import { AutoToolChat, Backend, Engine, SamplerType, loadLiteRtLm, type ChatInterface, type Conversation, type JsonValue, type Message, type Schema } from "@litert-lm/core";
 import type { Llm, Tool, ToolCall } from "./index.type";
 import { LITERT_CACHE, LITERT_MODEL_URL } from "../constants";
 import { SYSTEM_PROMPT } from "./llm";
 
-// shortcut: the WASM runtime loads from jsdelivr, so the first page load needs internet;
-// self-host node_modules/@litert-lm/core/wasm with loadLiteRtLm() when the demo must run offline.
 const ENGINE = {
   visionBackend: Backend.GPU,
   mainExecutorSettings: { maxNumImages: 2 }, // vision on this backend reserves space per image up front
@@ -37,6 +35,12 @@ export function createLiteRtLlm(): Llm {
   let tools: Tool[] = [];
   let onToolCall: ((call: Omit<ToolCall, "title">) => void) | undefined;
   let onToolStart: (() => void) | undefined; // set by reply() while it streams
+  // The stream can carry the same tool call in more than one chunk, and AutoToolChat runs each
+  // copy. Within a turn, a call with the same name and arguments runs once and is reported once.
+  const toolKey = (call: { name: string; arguments: Record<string, unknown> }) => `${call.name}:${JSON.stringify(call.arguments)}`;
+  let ran = new Map<string, unknown>(); // key → the result (or its promise)
+  let reported = new Set<string>();
+  let repeats = new Set<number>(); // ids of the copies, whose events are dropped
   let judge: Promise<Conversation> | null = null;
   let latest = ""; // the latest exchange, which is what ask() gets to see
   let loaded = false;
@@ -71,6 +75,8 @@ export function createLiteRtLlm(): Llm {
   function getEngine() {
     engine ??= (async () => {
       if (!supported()) throw new Error("This browser has no WebGPU, which LiteRT-LM needs.");
+      // The runtime is served from this site (see vite.config.ts), so it works offline once cached.
+      await loadLiteRtLm(`${import.meta.env.BASE_URL}litert-lm/`);
       const created = await Engine.create({ ...ENGINE, model: await fetchModel() });
       loaded = true;
       return created;
@@ -90,11 +96,20 @@ export function createLiteRtLlm(): Llm {
         tools: tools.map(({ run, parameters, ...declaration }) => ({
           ...declaration,
           parameters: parameters as Schema,
-          execute: (args) => run(args) as JsonValue,
+          execute: (args) => {
+            const key = toolKey({ name: declaration.name, arguments: args });
+            if (!ran.has(key)) ran.set(key, run(args));
+            return ran.get(key) as JsonValue;
+          },
         })),
         onToolProgress: (call) => {
-          if (call.status === "started") onToolStart?.();
-          onToolCall?.(call);
+          if (call.status === "started") {
+            onToolStart?.();
+            const key = toolKey(call);
+            if (reported.has(key)) repeats.add(call.id);
+            reported.add(key);
+          }
+          if (!repeats.has(call.id)) onToolCall?.(call);
         },
       });
       await chat.getHistory(); // creates the conversation now, so the system prompt is prefilled before the first turn
@@ -144,6 +159,9 @@ export function createLiteRtLlm(): Llm {
       let previous = "";
       let current = "";
       let holding = false;
+      ran = new Map();
+      reported = new Set();
+      repeats = new Set();
       onToolStart = () => {
         previous = current;
         current = "";

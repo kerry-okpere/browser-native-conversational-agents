@@ -37,9 +37,14 @@ const NO_IMAGE = "\n(No picture is attached to this message, whatever it says. D
 // reply the model is asked whether the user wanted to hang up, with a JSON
 // schema forcing a yes/no answer. The model only decides; the app hangs up.
 const END_CALL = {
-  question: "Did the user, in their latest message, say goodbye or ask to end the call?",
+  question: "In their latest message, did the user say goodbye, thank everyone for watching or listening, or otherwise wrap up and end the call?",
   schema: { type: "object", properties: { end_call: { type: "boolean" } }, required: ["end_call"] },
 };
+
+// A reply that ends the call must say so. When the model's didn't (it may not even know
+// the call is ending, if the question decided), this is added and spoken before hanging up.
+const SAID_GOODBYE = /\b(good ?bye|bye|hang(ing)? up|signing off|see you)\b/i;
+const SIGN_OFF = "Goodbye, I'm hanging up now.";
 
 type Stages = { vad: Vad; turn: Turn; stt: Stt; llm: Llm; tts: Tts };
 type Handlers = { [K in keyof CallEvents]: ((detail: CallEvents[K]) => void)[] };
@@ -282,7 +287,23 @@ export class VoiceCall implements Call {
       await Promise.all(spoken);
 
       if ((await hangUp).end_call && isCurrent()) {
-        this.end();
+        // When the question decided, no tool ran, so the chat is told the same way a tool would.
+        if (!this.endRequested) {
+          this.emit("tool", {
+            id: -this.nextId++,
+            name: "end_call",
+            title: "Hanging up",
+            arguments: {},
+            status: "completed",
+            result: "The user said goodbye, so the call ends.",
+          });
+        }
+        if (!SAID_GOODBYE.test(reply.text)) {
+          reply.text += ` ${SIGN_OFF}`;
+          update();
+          await tts.speak(SIGN_OFF).catch(() => {});
+        }
+        if (isCurrent()) this.end();
         return;
       }
     } catch (error) {

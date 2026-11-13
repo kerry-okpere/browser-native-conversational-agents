@@ -30,7 +30,7 @@ export const createTools = (call: Call): Tool[] => [
       "Hang up the call. Call it whenever the user says goodbye or asks you to end the call; nothing else ends the call. Say goodbye in the same reply.",
     run: () => {
       call.hangUp(); // after the goodbye has been spoken
-      return "The call ends once you finish this reply.";
+      return "The call ends once you finish this reply, so say goodbye and that you are hanging up.";
     },
     title: () => "Hanging up",
   },
