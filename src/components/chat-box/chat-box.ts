@@ -1,9 +1,10 @@
+import QRCode from 'qrcode';
 import html from './chat-box.html?raw';
 import css from './chat-box.css?inline';
 import shared from '../shared.css?inline';
-import type { Call, ReplyMessage, UserMessage } from '../../pipeline/index.type';
+import type { Call, ReplyMessage, ToolCall, UserMessage } from '../../pipeline/index.type';
 import { METRICS } from '../../constants';
-import { toSeconds } from '../../helpers';
+import { timestamp, toSeconds } from '../../helpers';
 
 // Where each kind of message's timings are measured from.
 const ORIGIN = { speech: 'From end of speech', text: 'From Send' };
@@ -22,6 +23,10 @@ const describeUser = (message: UserMessage) =>
           : ', ended by silence)')
       : '',
   ]);
+
+const describeTool = (call: ToolCall) =>
+  `${call.name}(${JSON.stringify(call.arguments)})\n→ ` +
+  { started: 'running…', completed: JSON.stringify(call.result), error: `failed: ${call.error}` }[call.status];
 
 const describeReply = (reply: ReplyMessage) =>
   join([
@@ -89,7 +94,7 @@ export class ChatBox extends HTMLElement {
     });
 
     // Adds a bubble with a small line under it for the timestamp and timings.
-    const addMessage = (role: 'user' | 'assistant') => {
+    const addMessage = (role: 'user' | 'assistant' | 'tool') => {
       const message = document.createElement('p');
       message.className = `message ${role}`;
 
@@ -130,11 +135,33 @@ export class ChatBox extends HTMLElement {
       scrollToBottom();
     });
 
+    // A tool call is reported as it starts and when it finishes; update its card in place.
+    const tools = new Map<number, ReturnType<typeof addMessage>>();
+
+    call.on('tool', (tool) => {
+      const card = tools.get(tool.id) ?? addMessage('tool');
+      tools.set(tool.id, card);
+
+      card.message.textContent = describeTool(tool);
+      card.message.classList.toggle('error', tool.status === 'error');
+      // A result with a `qr` link is drawn as a QR code, for the room to scan.
+      const qr = (tool.result as { qr?: string } | undefined)?.qr;
+      if (qr) {
+        const img = document.createElement('img');
+        img.alt = `QR code for ${qr}`;
+        QRCode.toDataURL(qr, { width: 640, margin: 1 }).then((src) => (img.src = src));
+        card.message.append(img);
+      }
+      card.meta.textContent = `${timestamp()} · Tool call`;
+      scrollToBottom();
+    });
+
     call.on('state', (state) => {
       // A new call starts with an empty conversation.
       if (state === 'starting') {
         messages.replaceChildren();
         replies.clear();
+        tools.clear();
       }
 
       // Typing can step in at any time, except while a reply is being written.

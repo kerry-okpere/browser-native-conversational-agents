@@ -48,7 +48,31 @@ export type Stt = Stage & {
   deleteUnused: () => Promise<void>;
 };
 
+/** A function the agent can call. The app runs it and the result goes back to the model. */
+export type Tool = {
+  name: string;
+  description: string;
+  /** JSON schema of the arguments; omit when the tool takes none. */
+  parameters?: object;
+  run: (args: Record<string, unknown>) => unknown;
+};
+
+/** A tool the agent called. It is sent again as the call progresses, with the same id. */
+export type ToolCall = {
+  id: number;
+  name: string;
+  arguments: Record<string, unknown>;
+  status: "started" | "completed" | "error";
+  result?: unknown;
+  error?: string;
+};
+
 export type Llm = Stage & {
+  /**
+   * Give the model tools to call during `reply`. `onCall` reports each call.
+   * Missing when the model has no tool calling; then `ask` decides instead.
+   */
+  useTools?: (tools: Tool[], onCall: (call: ToolCall) => void) => void;
   /**
    * Whether Chrome has the model, needs to download it, or can't run it.
    * Starting a download requires a user gesture, so when this isn't
@@ -190,6 +214,7 @@ export type CallEvents = {
   state: CallState;
   user: UserMessage;
   reply: ReplyMessage;
+  tool: ToolCall;
   /** `recovered` is the number of bytes freed. */
   closed: { recovered: number };
 };
@@ -205,6 +230,8 @@ export type Call = {
   attach: (image: Blob | null) => void;
   /** Stop listening and speaking, and forget the conversation. */
   end: () => void;
+  /** End the call once the reply being given has been spoken; for the end_call tool. */
+  hangUp: () => void;
   /** End the call, unload every model and delete the downloaded files. */
   close: () => Promise<void>;
   /** The spectrum of whoever is talking, as bands from 0 to 1. */

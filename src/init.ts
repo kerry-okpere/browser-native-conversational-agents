@@ -1,10 +1,11 @@
 import { createVad } from "./pipeline/vad";
 import { createTurn } from "./pipeline/turn";
 import { createStt } from "./pipeline/stt";
-import { createLlm } from "./pipeline/llm";
+import { createLiteRtLlm } from "./pipeline/llm.litert";
 import { KokoroTts } from "./pipeline/tts/kokoro.tts";
 import { PiperTts } from "./pipeline/tts/piper.tts";
 import { VoiceCall } from "./pipeline/call";
+import { createTools } from "./tools";
 import type { Stage, StageName, Start, Tts, WarmUp, WarmUpResult } from "./pipeline/index.type";
 
 export function init() {
@@ -12,7 +13,8 @@ export function init() {
   const vad = createVad();
   const turn = createTurn();
   const stt = createStt();
-  const llm = createLlm();
+  // const llm = createLlm(); // Chrome's built-in Gemini Nano 
+  const llm = createLiteRtLlm(); // Chrome's built-in Gemini Nano is the other variant: createLlm() from "./pipeline/llm"
   const tts: Tts = new KokoroTts() // PiperTTS can be deployed as TTS variant new PiperTts();
 
   const stages: Record<StageName, Stage> = { vad, turn, stt, llm, tts };
@@ -71,7 +73,7 @@ export function init() {
   };
 
   // The conversation: VAD -> STT -> LLM -> TTS
-  const call = new VoiceCall({ vad, turn, stt, llm, tts });
+  const call = new VoiceCall({ vad, turn, stt, llm, tts }, createTools);
 
   return { call, warmUp, start };
 }

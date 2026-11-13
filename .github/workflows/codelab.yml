@@ -6,7 +6,7 @@ name: Publish codelab
 
 on:
   push:
-    branches: [main, feat/voice-agent-call]
+    branches: [main, feat/voice-agent-call, feat/gemma-litert-lm]
     paths:
       - "codelab/**"
       - "src/**"

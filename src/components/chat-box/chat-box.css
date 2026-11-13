@@ -3,7 +3,7 @@
   grid-template-rows: 1fr auto; /* messages fill the panel, the form stays at the bottom */
   grid-template-columns: minmax(0, 1fr); /* a wide photo can't stretch the panel */
   gap: 0.75rem;
-  height: 28rem;
+  height: calc(100dvh - 6rem); /* the screen, minus the page padding */
   padding: 0.75rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -30,12 +30,19 @@
 .user {
   justify-self: end;
   background: var(--ink);
-  color: white;
+  color: var(--paper);
 }
 
 .assistant {
   justify-self: start;
   background: var(--surface);
+}
+
+.tool {
+  justify-self: start;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  border: 1px dashed var(--muted);
 }
 
 .meta {
@@ -98,6 +105,14 @@ input {
   max-height: 10rem;
   margin-bottom: 0.4rem;
   border-radius: calc(var(--radius) - 4px);
+}
+
+/* A QR code needs to be big enough to scan from the room. */
+.tool img {
+  width: 100%;
+  max-width: 12rem;
+  max-height: none;
+  margin: 0.5rem 0 0;
 }
 
 .image-only {

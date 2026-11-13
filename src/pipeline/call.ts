@@ -6,6 +6,7 @@ import type {
   Llm,
   ReplyMessage,
   Stt,
+  Tool,
   Tts,
   Turn,
   TurnCheck,
@@ -32,9 +33,9 @@ const NOT_SPEECH = /^[[(].*[\])]$/;
 // states the fact. Only the model sees this; the chat shows the user's words.
 const NO_IMAGE = "\n(No picture is attached to this message, whatever it says. Do not describe one.)";
 
-// The agent's one tool. The Prompt API has no tool calling, so after each reply
-// the model is asked whether the user wanted to hang up, with a JSON schema
-// forcing a yes/no answer. The model only decides; the app hangs up.
+// Ending the call without tool calling (the Prompt API has none): after each
+// reply the model is asked whether the user wanted to hang up, with a JSON
+// schema forcing a yes/no answer. The model only decides; the app hangs up.
 const END_CALL = {
   question: "Did the user, in their latest message, say goodbye or ask to end the call?",
   schema: { type: "object", properties: { end_call: { type: "boolean" } }, required: ["end_call"] },
@@ -45,7 +46,7 @@ type Handlers = { [K in keyof CallEvents]: ((detail: CallEvents[K]) => void)[] }
 
 export class VoiceCall implements Call {
   private current: CallState = "idle";
-  private handlers: Handlers = { state: [], user: [], reply: [], closed: [] };
+  private handlers: Handlers = { state: [], user: [], reply: [], tool: [], closed: [] };
   private nextId = 0;
   // Bumped whenever a new turn starts or the call ends, so that work still in
   // flight for an older turn can tell it has been overtaken.
@@ -55,9 +56,17 @@ export class VoiceCall implements Call {
   private stages: Stages;
   // An image waiting to go out with the next message.
   private image?: Blob;
+  // Set by hangUp(); the call ends once the reply has been spoken.
+  private endRequested = false;
 
-  constructor(stages: Stages) {
+  /** `tools` gets this call, so a tool can act on it (end_call does). */
+  constructor(stages: Stages, tools: (call: Call) => Tool[] = () => []) {
     this.stages = stages;
+    stages.llm.useTools?.(tools(this), (call) => this.emit("tool", call));
+  }
+
+  hangUp() {
+    this.endRequested = true;
   }
 
   get state() {
@@ -213,6 +222,7 @@ export class VoiceCall implements Call {
 
     vad.pause(); // the agent doesn't listen while it is thinking or talking
     this.setState("thinking");
+    this.endRequested = false;
 
     // Each sentence is spoken as soon as it is complete, while the rest of
     // the reply is still being written.
@@ -257,10 +267,11 @@ export class VoiceCall implements Call {
       reply.lastText = since();
       update();
 
-      // Decided while the reply is still being spoken, so it adds no wait.
-      const hangUp = llm
-        .ask<{ end_call: boolean }>(END_CALL.question, END_CALL.schema)
-        .catch(() => ({ end_call: false }));
+      // Decided while the reply is still being spoken, so it adds no wait. The
+      // end_call tool is the model's way to hang up; the question catches a goodbye it missed.
+      const hangUp = this.endRequested
+        ? Promise.resolve({ end_call: true })
+        : llm.ask<{ end_call: boolean }>(END_CALL.question, END_CALL.schema).catch(() => ({ end_call: false }));
 
       speak(unspoken); // whatever is left once the reply ends
       await Promise.all(spoken);

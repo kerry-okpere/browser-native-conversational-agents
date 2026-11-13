@@ -10,7 +10,7 @@ input {
   padding: 0.6rem 0.9rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: white;
+  background: var(--paper);
 }
 
 button {
@@ -30,7 +30,7 @@ input:disabled {
 button.primary {
   background: var(--ink);
   border-color: var(--ink);
-  color: white;
+  color: var(--paper);
 }
 
 button.danger {

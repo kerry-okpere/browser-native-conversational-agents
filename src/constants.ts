@@ -48,3 +48,11 @@ export const TURN = {
 
 // How many frequency bands the orb draws.
 export const ORB_BANDS = 32;
+
+// Where the audience can build this agent themselves; shown as a QR code on request.
+export const CODELAB_URL = "https://kerry-okpere.github.io/browser-native-conversational-agents/";
+
+// LiteRT-LM: the Gemma 4 web build, kept in Cache Storage after the first download.
+export const LITERT_CACHE = "litert-lm-cache";
+export const LITERT_MODEL_URL =
+  "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it-gpu.litertlm";
