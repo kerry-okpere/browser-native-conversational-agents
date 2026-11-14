@@ -1,12 +1,12 @@
 // LLM stage on LiteRT-LM: Gemma 4 running on WebGPU in the page, instead of Chrome's built-in model.
 import { AutoToolChat, Backend, Engine, SamplerType, loadLiteRtLm, type ChatInterface, type Conversation, type JsonValue, type Message, type Schema } from "@litert-lm/core";
 import type { Llm, Tool, ToolCall } from "./index.type";
-import { LITERT_CACHE, LITERT_MODEL_URL } from "../constants";
+import { LITERT_CACHE, LITERT_MODEL_URL, MAX_IMAGES } from "../constants";
 import { SYSTEM_PROMPT } from "./llm";
 
 const ENGINE = {
   visionBackend: Backend.GPU,
-  mainExecutorSettings: { maxNumImages: 2 }, // vision on this backend reserves space per image up front
+  mainExecutorSettings: { maxNumImages: MAX_IMAGES },
 };
 
 const CONVERSATION = {
@@ -43,6 +43,7 @@ export function createLiteRtLlm(): Llm {
   let repeats = new Set<number>(); // ids of the copies, whose events are dropped
   let judge: Promise<Conversation> | null = null;
   let latest = ""; // the latest exchange, which is what ask() gets to see
+  let images = 0; // pictures sent in this conversation; one over the budget breaks the conversation
   let loaded = false;
   let onDownloadProgress: ((fraction: number) => void) | undefined;
 
@@ -150,8 +151,9 @@ export function createLiteRtLlm(): Llm {
       await getConversation();
     },
     async reply(text, onChunk, image) {
+      if (image && images >= MAX_IMAGES) throw new Error(`I can only look at ${MAX_IMAGES} pictures per call. End the call and start another to show me more.`);
+      if (image) images++;
       const content = image ? [{ type: "text" as const, text }, { type: "image" as const, data: image }] : text;
-      const reader = (await getConversation()).sendMessageStreaming({ role: "user", content }).getReader();
 
       // After a tool call the model tends to repeat what it said before calling it,
       // so text that merely repeats the previous round is held back and dropped.
@@ -173,6 +175,7 @@ export function createLiteRtLlm(): Llm {
       };
 
       try {
+        const reader = (await getConversation()).sendMessageStreaming({ role: "user", content }).getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -184,6 +187,13 @@ export function createLiteRtLlm(): Llm {
             emit(current); // it only started like the previous round
           }
         }
+      } catch (error) {
+        // A failed turn leaves the conversation unusable, so the next turn starts a fresh one (the history is lost).
+        conversation?.then((c) => c.delete()).catch(() => {});
+        conversation = null;
+        images = 0;
+        void getConversation();
+        throw error;
       } finally {
         onToolStart = undefined;
       }
@@ -202,6 +212,7 @@ export function createLiteRtLlm(): Llm {
       for (const open of [conversation, judge]) open?.then((c) => c.delete()).catch(() => {});
       conversation = judge = null;
       latest = "";
+      images = 0;
     },
   };
 }

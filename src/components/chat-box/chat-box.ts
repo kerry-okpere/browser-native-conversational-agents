@@ -3,7 +3,7 @@ import html from './chat-box.html?raw';
 import css from './chat-box.css?inline';
 import shared from '../shared.css?inline';
 import type { Call, ReplyMessage, ToolCall, UserMessage } from '../../pipeline/index.type';
-import { METRICS } from '../../constants';
+import { MAX_IMAGES, METRICS } from '../../constants';
 import { timestamp, toSeconds } from '../../helpers';
 
 // Where each kind of message's timings are measured from.
@@ -87,6 +87,15 @@ export class ChatBox extends HTMLElement {
       attach.title = image ? 'Remove the picture' : 'Show the agent a picture';
     };
 
+    // The engine takes a fixed number of pictures per call; past it the button goes quiet.
+    let sent = 0;
+    const showBudget = () => {
+      const spent = sent >= MAX_IMAGES;
+      picker.disabled = spent;
+      attach.classList.toggle('spent', spent);
+      if (spent) attach.title = `The agent can see ${MAX_IMAGES} pictures per call`;
+    };
+
     picker.addEventListener('change', () => {
       const image = picker.files?.[0] ?? null;
       picker.value = ''; // so choosing the same file again still fires
@@ -141,6 +150,8 @@ export class ChatBox extends HTMLElement {
         bubble.prepend(thumbnail(user.image));
         bubble.classList.toggle('image-only', !user.text);
         showAttached(null); // it has been sent
+        sent++;
+        showBudget();
       }
       showNotes(foot, describeUser(user));
       turns.textContent = `${++count} ${count === 1 ? 'turn' : 'turns'}`;
@@ -192,8 +203,10 @@ export class ChatBox extends HTMLElement {
         tools.clear();
         chipRow = null;
         count = 0;
+        sent = 0;
         turns.textContent = '0 turns';
         showAttached(null);
+        showBudget();
       }
 
       // Typing can step in at any time, except while a reply is being written or after the call.

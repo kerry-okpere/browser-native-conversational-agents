@@ -163,6 +163,11 @@ input[type='text']:disabled {
   color: var(--accent);
 }
 
+.attach.spent {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
 .attach.chosen {
   padding: 0;
 }

@@ -72,5 +72,7 @@ export const QR_URL = "https://kerry-okpere.github.io/browser-native-conversatio
 
 // LiteRT-LM: the Gemma 4 web build, kept in Cache Storage after the first download.
 export const LITERT_CACHE = "litert-lm-cache";
+/** Pictures per call. The engine reserves GPU memory for this many up front, so a picture past it breaks the conversation. */
+export const MAX_IMAGES = 4;
 export const LITERT_MODEL_URL =
   "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it-gpu.litertlm";

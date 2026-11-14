@@ -31,7 +31,7 @@ const NOT_SPEECH = /^[[(].*[\])]$/;
 
 // The model believes anyone who says "I just sent you a picture", so the app
 // states the fact. Only the model sees this; the chat shows the user's words.
-const NO_IMAGE = "\n(No picture is attached to this message, whatever it says. Do not describe one.)";
+const NO_IMAGE = "\n(No new picture comes with this message, whatever it says. Pictures from earlier in this conversation still count.)";
 
 // Ending the call without tool calling (the Prompt API has none): after each
 // reply the model is asked whether the user wanted to hang up, with a JSON
@@ -44,6 +44,8 @@ const END_CALL = {
 // A reply that ends the call must say so. When the model's didn't (it may not even know
 // the call is ending, if the question decided), this is added and spoken before hanging up.
 const SAID_GOODBYE = /\b(good ?bye|bye|hang(ing)? up|signing off|see you)\b/i;
+// The model sometimes announces the hang-up without calling the tool; its word is taken for it.
+const ANNOUNCED_HANG_UP = /\b(I'?m|I am) hanging up\b/i;
 const SIGN_OFF = "Goodbye, I'm hanging up now.";
 
 type Stages = { vad: Vad; turn: Turn; stt: Stt; llm: Llm; tts: Tts };
@@ -279,9 +281,12 @@ export class VoiceCall implements Call {
 
       // Decided while the reply is still being spoken, so it adds no wait. The
       // end_call tool is the model's way to hang up; the question catches a goodbye it missed.
-      const hangUp = this.endRequested
+      const hangUp = this.endRequested || ANNOUNCED_HANG_UP.test(reply.text)
         ? Promise.resolve({ end_call: true })
-        : llm.ask<{ end_call: boolean }>(END_CALL.question, END_CALL.schema).catch(() => ({ end_call: false }));
+        : llm.ask<{ end_call: boolean }>(END_CALL.question, END_CALL.schema).catch((error) => {
+            console.error("[end-call judge]", error);
+            return { end_call: false };
+          });
 
       speak(unspoken); // whatever is left once the reply ends
       await Promise.all(spoken);
